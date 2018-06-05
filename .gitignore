@@ -1,0 +1,7 @@
+/.pytest_cache
+/env
+*.bak/
+*__pycache__
+*.old*
+*.old2*
+.*
