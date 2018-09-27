@@ -32,7 +32,13 @@ class Type(Constraint):
 
     def compile(self, system):
         if isinstance(self.value, str):
-            self._type = self.schema.system.primitives[self.value]
+            try:
+                self._type = self.schema.system.primitives[self.value]
+            except KeyError:
+                if system.name:
+                    raise KeyError(f"Unknown primitive type, {system.name} system has no primitive {self.value!r}")
+                else:
+                    raise KeyError(f"Unknown primitive type, system has no primitive {self.value!r}")
         else:
             self._type = self.value
 
@@ -567,13 +573,17 @@ class AllOf(Constraint):
         self._subschemas = [system.schema(item) for item in self.value]
 
     def __call__(self, instance, validate=False, partial=False):
-        errors = {}
-        for index, sub in enumerate(self._subschemas):
-            result = sub.validate(instance, partial=partial)
-            if not result:
-                errors[f"allof({index})"] = result
-        if errors:
-            self.fail(errors)
+        if validate:
+            errors = {}
+            for index, sub in enumerate(self._subschemas):
+                result = sub.validate(instance, partial=partial)
+                if not result:
+                    errors[f"allof({index})"] = result
+            if errors:
+                self.fail(errors)
+        else:
+            for sub in self._subschemas:
+                instance = sub(instance)
         return instance
 
 
@@ -586,16 +596,24 @@ class AnyOf(Constraint):
         self._subschemas = [system.schema(item) for item in self.value]
 
     def __call__(self, instance, validate=False, partial=False):
-        success = False
-        errors = {}
-        for index, sub in enumerate(self._subschemas):
-            result = sub.validate(instance, partial=partial)
-            if not result:
-                errors[f"anyof({index})"] = result
-            else:
-                success = True
-        if not success:
-            self.fail(errors)
+        if validate:
+            success = False
+            errors = {}
+            for index, sub in enumerate(self._subschemas):
+                result = sub.validate(instance, partial=partial)
+                if not result:
+                    errors[f"anyof({index})"] = result
+                else:
+                    success = True
+            if not success:
+                self.fail(errors)
+        else:
+            for index, sub in enumerate(self._subschemas):
+                try:
+                    return sub(instance, partial=partial)
+                except (TypeError, ValueError) as e:
+                    continue
+            self.fail()
         return instance
 
 
@@ -608,16 +626,18 @@ class OneOf(Constraint):
         self._subschemas = [system.schema(item) for item in self.value]
 
     def __call__(self, instance, validate=False, partial=False):
-        success = 0
+        success = set()
         errors = {}
         for index, sub in enumerate(self._subschemas):
             result = sub.validate(instance, partial=partial)
             if not result:
                 errors[f"anyof({index})"] = result
             else:
-                success += 1
-        if success != 1:
+                success.add(sub)
+        if len(success) != 1:
             self.fail(errors)
+        if not validate:
+            return success.pop()(instance, partial=partial)
         return instance
 
 

@@ -1,9 +1,9 @@
-import inspect
+import inspect, types
 import inflection
 from .schema import Configurable, Schematic, Undefined
 from .schema import fields
 
-from flask import request, jsonify, make_response
+from flask import request, jsonify, make_response, current_app
 from werkzeug.exceptions import BadRequest
 
 
@@ -139,7 +139,7 @@ class Response(Schematic):
 
 
 class Operation(Schematic):
-    callable = fields.Callable(required=True)
+    callable = fields.Callable(required=True, export=False)
     operation_id = fields.String(primary_key=True, default=fields.uuid4hex)
     method = fields.Enum(["get", "put", "post", "delete", "options", "head", "patch", "trace"], default="get", required=True)
     tags = fields.String(repeated=True)
@@ -153,6 +153,9 @@ class Operation(Schematic):
     security = fields.List(map=True, items={'type': 'str'})
     servers = fields.InstanceOf(Server, repeated=True)
 
+    def __str__(self):
+        return self.operation_id
+
     def __repr__(self):
         return f'<{self.__class__.__name__} {self.operation_id}>'
 
@@ -162,51 +165,66 @@ class Operation(Schematic):
             arg = getattr(self.body, 'arg', None)
             if arg:
                 params[arg] = body
+
             result = self.callable(**params)
-            return self.create_response(result, 200)
+            
+            if isinstance(result, int):
+                result = str(result)
+
+            if isinstance(result, tuple):
+                return self.build_response(*result)
+            elif isinstance(result, str) and result in self.responses:
+                return self.build_response('', result)
+            else:
+                return self.build_response(result, 200)
         except BadRequest as e:
             r = jsonify(str(e))
             r.status_code=400
             return r
 
-    def create_response(self, result, status_code=200, **kwargs):
-        if result is None:
-            return ('', status_code)
-
+    def build_response(self, body, status_code, **kwargs):
         try:
             response = self.responses[str(status_code)]
-        except:
-            response = self.responses['default']
+        except KeyError:
+            if 'default' in self.responses:
+                response = self.responses['default']
+            elif status_code == 200:
+                return make_response(body, 200, **kwargs)
+            else:
+                current_app.logger.error(f'Unnable to find response for status code: {status_code!r}')
+                return make_response(f'Unnable to find response for status code: {status_code!r}', 500)
 
-        content = response.content['application/json']
+        if not response.content:
+            return make_response(body or '', status_code, **kwargs)
+
+        content_type, content = self.find_desired_content_object_from_request(response.content)
+        if content is None:
+            return make_response(f'Not able to find acceptable content to return. Available types: {response.content.keys()}', 406)
+
         if content.schema:
-            response = make_response( content.schema.serialize(result, 'application/json'), status_code, **kwargs)
-            response.headers['Content-Type'] = 'application/json'
-            return response
+            response = make_response(content.schema.serialize(body, content_type), status_code, **kwargs)
         else:
-            response = make_response( result, status_code, **kwargs)
-            response.headers['Content-Type'] = 'application/json'
-            return response
+            response = make_response(body or '', status_code, **kwargs)
 
+        response.headers['Content-Type'] = content_type
+        return response
 
-    def register(self, api, path, methods=None, **kwargs):
-        methods = methods or [self.method]
-        api.add_url_rule(str(path), endpoint=self.operation_id, view_func=self, methods=methods)
+    def find_desired_content_object_from_request(self, content_objects):
+        mimetypes = request.accept_mimetypes
+        best = mimetypes.best_match(content_objects.keys(), 'application/json')
+        return best, content_objects.get(best, None)
 
+    def register(self, app, options, first_registration=False):
+        path = options.get('url_prefix', '')
+        methods = options.get('methods', None) or [self.method]
+        app.add_url_rule(str(path), endpoint=self.operation_id, view_func=self, methods=methods)
 
-class PathItem(Schematic):
-    summary = fields.String()
-    description = fields.String()
-    get = fields.InstanceOf(Operation)
-    put = fields.InstanceOf(Operation)
-    delete = fields.InstanceOf(Operation)
-    options = fields.InstanceOf(Operation)
-    head = fields.InstanceOf(Operation)
-    patch = fields.InstanceOf(Operation)
-    trace = fields.InstanceOf(Operation)
-    servers = fields.InstanceOf(Server, repeated=True)
-    parameters = fields.InstanceOf(Parameter, repeated=True)
-
+    def bind(self, collection):
+        """
+        Binds the operation to a collection, the callable will be injected with 'self' assigned to the
+        collection, and the schema.
+        """
+        self.callable = types.MethodType(self.callable, obj)
 
 
 ### Define ###

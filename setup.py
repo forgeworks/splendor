@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-EXCLUDE_FROM_PACKAGES = []
+EXCLUDE_FROM_PACKAGES = ['tests']
 
 setup(
     name='Splendor',

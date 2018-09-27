@@ -2,7 +2,14 @@ import inflection
 import json
 
 
-Undefined = object()
+class Undefined:
+    def __repr__(self):
+        return "<Undefined>"
+
+    def __bool__(self):
+        return False
+
+Undefined = Undefined()
 
 
 class ValidationError(ValueError):
@@ -147,6 +154,9 @@ class Constraint:
     def describe(self, description=None):
         return (description or self.description).format(**self.__dict__)
 
+    def transform(self, system, other):
+        return other.schema(self.value)
+
     def __call__(self, instance, validate=False, partial=False):
         return instance
 
@@ -167,7 +177,9 @@ class System:
     def __init__(self, **attrs):
         self.name = None
         self.primitives = {}
-        self.transformations = {}
+        self.schema_transformations = {}
+        self.constraint_transformations = {}
+        self.constraint_analogs = {}
         self.constraints = {}
         self.constraint_primitives = {}
         self.name_inflection = inflection.underscore
@@ -239,17 +251,11 @@ class System:
                 return True
         return False
 
-    def map_primitives(self, system, map):
-        for other_name, our_name in map.items():
-            our_name = self.name_inflection(our_name)
-            other_name = other_system.name_inflection(other_name)
-            edge = (other_system.name + '.' + other_name, our_name)
-            self.transformations[edge] = lambda x: other_system.primitives[other_name](x)
-
     def borrow_constraint(self, other_system, name, new_name=None, primitives=None):
         c = other_system.constraints[other_system.name_inflection(name)]
         new_name = self.name_inflection(new_name or name)
         self.register_constraint(c, name=new_name, primitives=primitives)
+        self.constraint_analogs[(other_system, name)] = new_name
 
     def register_instancer(self, schema, fn):
         if not isinstance(schema, str):
@@ -276,6 +282,20 @@ class System:
             return json.dumps(data)
         raise RuntimeError(f"Unable to serialize content type: {content_type!r}")
 
+    def transform_schema(self, schema, other_system):
+        if schema.name:
+            sig = (other_system, schema.name)
+            transformation = self.schema_transformations.get(sig, None)
+            if transformation:
+                return transformation(self, schema, other_system)
+        return schema.transform(self, other_system)
+
+    def transform_constraint(self, c, other_system):
+        sig = (other_system, c.name)
+        transformation = self.constraint_transformations.get(sig, None)
+        if transformation:
+            return transformation(self, c, other_system)
+        return constraint.transform(self, other_system)
 
 
 class Schema:
@@ -302,6 +322,8 @@ class Schema:
             try:
                 instance = type_constraint(instance, validate=False, partial=partial)
             except ValueError as e:
+                raise ConstraintFailure(type_constraint, None, ['type'], str(e))
+            except ValidationError as e:
                 e.path.insert(0, 'type')
                 raise
 
@@ -375,6 +397,9 @@ class Schema:
             raise NameError(f"Cannot find constraint: {name}")
         else:
             return default
+
+    def transform(self, system, other):
+        return other.schema(self.value)
 
     def _set_constraint(self, name, value):
         if value is Undefined:

@@ -439,6 +439,12 @@ def test_all_of():
     assert s.validate('foobar')
     assert not s.validate('foobarbar')
 
+    s = schema({
+        'allOf': [{'type': 'string', 'max_length': 3}, {'type': 'integer', 'maximum': 5}]
+    })
+
+    assert s('666---') == 5
+
 
 def test_any_of():
     s = schema({
@@ -452,6 +458,16 @@ def test_any_of():
     assert s.validate(8)
     assert not s.validate(10)
 
+    s = schema({
+        'anyOf': [{'type': 'integer', 'maximum': 4}, {'type': 'string'}]
+    })
+
+    assert s.validate("asdf")
+    assert s.validate(4)
+
+    assert s("asdf") == "asdf"
+    assert s(10) == 4
+    
 
 def test_one_of():
     s = schema({

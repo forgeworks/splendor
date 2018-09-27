@@ -3,6 +3,7 @@ import itertools
 import ipaddress
 import inflection
 import logging
+from datetime import date, datetime, time
 from collections import OrderedDict
 from collections.abc import Mapping, MutableMapping, Sequence, Callable
 from numbers import Number
@@ -27,10 +28,14 @@ system = System(
         'mapping': Mapping,
         'sequence': Sequence,
         'list': list,
+        'set': set,
         'tuple': tuple,
         'dict': dict,
         'bool': bool,
-        'object': object
+        'object': object,
+        'datetime': datetime,
+        'date': date,
+        'time': time
     })
 
 primitives = system.primitives
@@ -121,3 +126,17 @@ class InstanceOf(Constraint):
         else:
             self.fail()
 
+
+@system.constraint(['object', 'dict'])
+class SchemaValue(Constraint):
+    description = "must be a schema or describe a schema"
+
+    def __call__(self, instance, validate=False, partial=False):
+        if isinstance(instance, Schema):
+            return instance
+        elif hasattr(instance, '__schema__'):
+            return instance.__schema__
+        elif isinstance(instance, dict):
+            return Schema(instance, system=self.schema.system)
+        else:
+            self.fail()

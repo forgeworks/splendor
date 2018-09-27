@@ -1,15 +1,5 @@
 
 
-
-
-loft-api/
-
-
-loft-guides/
-
-
-
-
 class Loft(Api):
     """
 

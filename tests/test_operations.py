@@ -1,3 +1,4 @@
+import pytest
 from unittest.mock import MagicMock
 
 from splendor.operation import Operation
@@ -6,15 +7,15 @@ from splendor.schema import fields
 from .test_collections import House, houses
 
 
-def test_put(app, client, houses):
+def test_put(app, client):
     house = {'name': 'House', 'zip': '60618'}
     add_house = MagicMock()
 
-    @app.route('/houses/<key>', methods=["put"])
+    @app.route('/houses/<id>', methods=["put"])
     @put(schema=House)
-    def put_item(key:fields.Integer(), item):
+    def put_item(id:fields.Integer(), item):
         """Adds a house."""
-        add_house(key, item.__dict__)
+        add_house(id, item.__dict__)
         return item
 
     assert put_item.method == 'put'
@@ -33,11 +34,11 @@ def test_patch(app, client):
     house = {'name': 'House', 'zip': '60618'}
     update_house = MagicMock()
 
-    @app.route('/houses/<key>', methods=["patch"])
+    @app.route('/houses/<id>', methods=["patch"])
     @patch(schema=House)
-    def patch_item(key:fields.Integer(), item):
+    def patch_item(id:fields.Integer(), item):
         """Updates a house."""
-        update_house(key, item.__dict__)
+        update_house(id, item.__dict__)
         house.update(item.__dict__)
         return house
 
@@ -58,11 +59,11 @@ def test_get(app, client):
     get_house = MagicMock()
 
     # Get
-    @app.route('/houses/<key>', methods=["get"])
+    @app.route('/houses/<id>', methods=["get"])
     @get(schema=House)
-    def get_item(key:fields.Integer()):
+    def get_item(id:fields.Integer()):
         """Get a house."""
-        get_house(key)
+        get_house(id)
         return house
 
     assert get_item.method == 'get'
@@ -101,11 +102,11 @@ def test_delete(app, client):
     delete_house = MagicMock()
 
     # Get
-    @app.route('/houses/<key>', methods=["delete"])
+    @app.route('/houses/<id>', methods=["delete"])
     @delete(schema=House)
-    def delete_item(key:fields.Integer()):
+    def delete_item(id:fields.Integer()):
         """Delete a house."""
-        delete_house(key)
+        delete_house(id)
 
     assert delete_item.method == 'delete'
     assert set(delete_item.tags) == set(['house', 'delete'])
@@ -148,4 +149,11 @@ def test_listing(app, client):
     house_json = r.get_json()
     assert house_json == [house]
 
+
+def test_param_missing(app, client):
+    with pytest.raises(RuntimeError):
+        @app.route('/houses/<id>', methods=["get"])
+        @get(schema=House)
+        def should_not_work(not_key):
+            pass
 

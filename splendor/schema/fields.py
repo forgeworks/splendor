@@ -62,11 +62,13 @@ class Field:
                 'name',
                 'primary_key',
                 'export',
-                'import'])
+                'import'
+                'system'])
 
     def __init__(self, **config):
         self.config = config
         self.schema = None
+        self.default = Undefined
         self.order = self.__class__.order
         self.__class__.order += 1
         self.setup( config.get('name', None), config.get('system', native) )
@@ -89,26 +91,37 @@ class Field:
             name = system.name_inflection(k)
             value[name] = v
 
+        self.default = self.config.get('default', Undefined)
+
         try:
             if 'repeated' in self.config:
-                value.pop('repeated')
-                value.pop('default', None)
-                self.schema = system.schema({'type': 'list', 'items': value})
+                meta = {'type': 'list'}
+                for k in self.meta:
+                    if k in value:
+                        meta[k] = value.pop(k)
+                meta['items'] = value
+                self.schema = system.schema(meta)
+                self.default = self.default or list
             elif 'map' in self.config:
-                value.pop('map')
-                value.pop('default', None)
-                self.schema = system.schema({'type': 'dict', 'additional_properties': value})
+                meta = {'type': 'dict'}
+                for k in self.meta:
+                    if k == 'default':
+                        continue
+                    if k in value:
+                        meta[k] = value.pop(k)
+                meta['additional_properties'] = value
+                self.schema = system.schema(meta)
+                self.default = self.default or dict
             else:
                 self.schema = system.schema(value)
         except Exception as e:
             raise FieldSetupError(self, self.name, e)
 
     def get_default(self, obj):
-        if 'default' in self.config:
-            default = self.config['default']
-            if callable(default):
-                return default()
-            return default
+        if self.default is not Undefined:
+            if callable(self.default):
+                return self.default()
+            return self.default
         else:
             return Undefined
 
@@ -121,7 +134,7 @@ class Field:
             if default is not Undefined:
                 obj.__dict__[self.name] = default
                 return default
-            raise AttributeError("%r object has no value for field %r" % (obj, self.name))
+            raise AttributeError("%r object has no value for field %r, and no default is defined" % (obj, self.name))
         return result
 
     def __set__(self, obj, value):
@@ -135,10 +148,21 @@ class Field:
 
 
 def get_fields(type):
-    properties = {}
+    fields = {}
     for name, field in vars(type).items():
         if isinstance(field, Field):
-            properties[name] = field
+            fields[name] = field
+    return fields
+
+
+def get_field_values(instance, export=False):
+    properties = {}
+    for name, field in get_fields(instance.__class__).items():
+        if export is True and field.config.get('export', True) is False:
+            continue
+        value = getattr(instance, name, Undefined)
+        if value is not Undefined:
+            properties[name] = value
     return properties
 
 
@@ -157,17 +181,36 @@ def generate_schema_for_class(name, bases, namespace, system=None):
 
     system = system or native
 
+    new_values = {}
     properties = {}
     for k, v in namespace.items():
         if isinstance(v, Field):
             v.setup(k, system)
             properties[k] = v.schema
+        else:
+            if value is not Undefined:
+                new_values[k] = v
+
+    ## Validate New Values ###
+    old_schema = Schema(value, system=system or native)
+    namespace.update( old_schema(new_values, partial=True) )
+
+    from pprint import pprint
+    print(name)
+    if name == 'GuideCollection':
+        print("-- OLD SCHEMA --")
+        pprint(old_schema)
+        print("-- New Values --")
+        pprint(new_values)
+        print("-- Namespace --")
+        pprint(namespace)
 
     if properties:
         value['properties'] = properties
 
     schema = Schema(value, system=system or native)
     schema.name = name
+
     return schema
 
 
@@ -203,6 +246,9 @@ class Schematic(metaclass=SchematicType):
     def validate(self):
         self.__schema__.validate(self.__dict__)
 
+    def is_valid(self):
+        return self.validate() is None
+
 
 class Configurable(Schematic):
     def __call__(self, **value):
@@ -217,19 +263,29 @@ Callable = Field(type='callable')
 Object = Field(type='object')
 Dict = Field(type='dict')
 List = Field(type='list')
+Set = Field(type='set')
+DateTime = Field(type='datetime')
+Date = Field(type='date')
+URIString = Field(type='str', format='validate_uri')
 Any = Field()
 
+def AnyOf(t, **kwargs):
+    return Field(any_of=t, **kwargs)
 
 def InstanceOf(t, **kwargs):
     return Object(instance_of=t, **kwargs)
 
+def AnyInstanceOf(types, **kwargs):
+    return Field(any_of=[InstanceOf(t) for t in types], **kwargs)
 
 def Enum(choices, **kwargs):
     return String(enum=choices, **kwargs)
 
-
 def Duck(t, **kwargs):
     return Object(has_attrs=t, **kwargs)
+
+def SchemaField(**kwargs):
+    return Field(schema_value=True, **kwargs)
 
 
 def uuid4hex():
@@ -238,16 +294,6 @@ def uuid4hex():
 def UUID(**kwargs):
     kwargs.setdefault('default', uuid4hex)
     return String(**kwargs)
-
-
-class SchemaField(Field):
-    def __set__(self, obj, value):
-        if value is Undefined:
-            self.__delete__(obj)
-        else:
-            if not isinstance(value, Schema):
-                value = obj.__schema__.system.schema(value)
-            obj.__dict__[self.name] = self.schema(value)
 
 
 """

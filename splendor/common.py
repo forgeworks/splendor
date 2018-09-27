@@ -2,98 +2,50 @@
 Common operation factories.
 """
 import types
-import inspect
 from functools import wraps
 
 from .schema import fields, Schematic, Undefined
-from .operation import Operation
-
-def get_schema(instance):
-    if hasattr(instance, '__schema__'):
-        return instance.__schema__
-    return instance
+from .operation import Operation, Parameter
+from .util import get_schema, build_parameters
 
 
-class CollectionOperation(Schematic):
+class OperationTemplate(Schematic):
     callable = fields.Callable()
     template = fields.Callable()
     kwargs = fields.Dict()
 
-    def build(self, collection, **kwargs):
-        kwargs = dict(self.kwargs, **kwargs)
-        if collection.schema:
-            kwargs.setdefault('schema', collection.schema)
-        return self.template(types.MethodType(self.callable, collection), **kwargs)
-
-    def register(self, api, path, **kwargs):
-        api.add_url_rule(str(path), endpoint=self.operation_id, view_func=self.__call__, methods=methods)
-
-
-def build_parameters(signature, ignore={}, path=0):
-    results = []
-    for i, param in enumerate(signature.parameters.values()):
-        if param.name in ignore:
-            continue
-
-        if param.name == 'self':
-            continue
-
-        if param.annotation is not inspect.Parameter.empty:
-            if isinstance(param.annotation, dict) or isinstance(param.annotation, fields.Schema):
-                param_schema = param.annotation
-            elif hasattr(param.annotation, '__schema__'):
-                param_schema = param.annotation.__schema__
-            else:
-                param_schema = {'type': param.annotation}
-        else:
-            param_schema = {}
-
-        if param.default is not inspect.Parameter.empty:
-            required = bool(param.default)
-        else:
-            required = Undefined
-
-        if i <= path:
-            results.append({'name': param.name,
-                            'location': 'path',
-                            'required': True,
-                            'schema': param_schema})
-        else:
-            results.append({'name': param.name,
-                            'location': 'query',
-                            'required': required,
-                            'style': 'matrix',
-                            'schema': param_schema})
-
-    return results
+    def build(self, binding, schema, **kwargs):
+        kwargs = dict(self.kwargs, schema=schema, **kwargs)
+        return self.template(types.MethodType(self.callable, binding), **kwargs)
 
 
 def operation_template(fn):
     "Decorates a function to act as a template, which takes a callable and returns an operation."
-    def wrapper(callable, **kwargs):
-        sig = inspect.signature(callable)
-        fn_parameters = list(sig.parameters.values())
-        if fn_parameters[0].name == 'self':
-            return CollectionOperation(callable=callable, 
-                                       template=fn,
-                                       kwargs=kwargs)
-        return fn(callable, **kwargs)
+    def wrapper(callable, schema=Undefined, **kwargs):
+        if schema is Undefined:
+            return OperationTemplate(callable=callable, 
+                                     template=fn,
+                                     kwargs=kwargs)
+        return fn(callable, schema=schema, **kwargs)
 
+    # This stuff just lets you do @put or @put(kwarg=value)
     def decorator(callable=None, **kwargs):
-        def inner_wrapper(callable):
-            return wrapper(callable, **kwargs)
         if not kwargs:
             return wrapper(callable)
-        else:
-            return inner_wrapper
+
+        def inner_wrapper(callable):
+            return wrapper(callable, **kwargs)
+        return inner_wrapper
+
     return decorator
 
 
 @operation_template
-def put(callable, schema=None, **kwargs):
-    parameters = build_parameters(inspect.signature(callable), ignore=['item'], path=1)
+def put(callable, schema=None, name=None, **kwargs):
+    parameters = build_parameters(callable, ignore=['item'], path="<id>")
+
     schema = get_schema(schema)
-    name = schema.name.lower()
+    name = name or schema.name.lower()
 
     attrs = dict(
         callable = callable,
@@ -135,27 +87,30 @@ def put(callable, schema=None, **kwargs):
 
 
 @operation_template
-def get(callable, schema=None, **kwargs):
-    parameters = build_parameters(inspect.signature(callable), path=1)
+def get(callable, schema=None, name=None, **kwargs):
+    parameters = build_parameters(callable, path="<id>")
 
     schema = get_schema(schema)
-    name = schema.name.lower()
+    name = name or schema.name.lower()
 
     attrs = dict(
         callable = callable,
         operation_id = f'get_{name}',
-        description = callable.__doc__ or f'GET {name} item by key',
+        description = callable.__doc__ or f'GET {name} item by id',
         method = "get",
         tags = [name, 'get'] + kwargs.get('extra_tags', []),
         parameters = parameters + kwargs.get('extra_parameters', []),
         responses = {
             "200": {
-                "description": f'{name} item that was added.',
+                "description": f'{name} item found in the datastore.',
                 "content": {
                     'application/json': {
                         'schema': schema
                     }
                 }
+            },
+            "404": {
+                "description": f'{name} item cannot be found.',
             }
         },
         security = {
@@ -169,11 +124,11 @@ def get(callable, schema=None, **kwargs):
     return op
 
 @operation_template
-def post(callable, schema=None, **kwargs):
-    parameters = build_parameters(inspect.signature(callable), ignore=['item'])
+def post(callable, schema=None, name=None, **kwargs):
+    parameters = build_parameters(callable, ignore=['item'])
 
     schema = get_schema(schema)
-    name = schema.name.lower()
+    name = name or schema.name.lower()
 
     attrs = dict(
         callable = callable,
@@ -215,11 +170,11 @@ def post(callable, schema=None, **kwargs):
 
 
 @operation_template
-def patch(callable, schema=None, **kwargs):
-    parameters = build_parameters(inspect.signature(callable), ignore=['item'], path=1)
+def patch(callable, schema=None, name=None, **kwargs):
+    parameters = build_parameters(callable, ignore=['item'], path="<id>")
 
     schema = get_schema(schema)
-    name = schema.name.lower()
+    name = name or schema.name.lower()
 
     attrs = dict(
         callable = callable,
@@ -261,11 +216,11 @@ def patch(callable, schema=None, **kwargs):
 
 
 @operation_template
-def delete(callable, schema=None, **kwargs):
-    parameters = build_parameters(inspect.signature(callable), path=1)
+def delete(callable, schema=None, name=None, **kwargs):
+    parameters = build_parameters(callable, path="<id>")
 
     schema = get_schema(schema)
-    name = schema.name.lower()
+    name = name or schema.name.lower()
 
     attrs = dict(
         callable = callable,
@@ -292,11 +247,11 @@ def delete(callable, schema=None, **kwargs):
     
 
 @operation_template
-def listing(callable, schema=None, **kwargs):
-    parameters = build_parameters(inspect.signature(callable), path=-1)
+def listing(callable, schema=None, name=None, **kwargs):
+    parameters = build_parameters(callable)
 
     schema = get_schema(schema)
-    name = schema.name.lower()
+    name = name or schema.name.lower()
 
     attrs = dict(
         callable = callable,

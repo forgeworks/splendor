@@ -1,5 +1,6 @@
 /.pytest_cache
 /env
+*.egg-info
 *.bak/
 *__pycache__
 *.old*
