@@ -194,17 +194,7 @@ def generate_schema_for_class(name, bases, namespace, system=None):
     ## Validate New Values ###
     old_schema = Schema(value, system=system or native)
     namespace.update( old_schema(new_values, partial=True) )
-
-    from pprint import pprint
-    print(name)
-    if name == 'GuideCollection':
-        print("-- OLD SCHEMA --")
-        pprint(old_schema)
-        print("-- New Values --")
-        pprint(new_values)
-        print("-- Namespace --")
-        pprint(namespace)
-
+    
     if properties:
         value['properties'] = properties
 

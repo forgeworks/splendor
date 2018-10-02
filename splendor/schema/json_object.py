@@ -423,7 +423,7 @@ class Properties(Constraint):
                 try:
                     results[name] = schema(value)
                 except ValidationError as e:
-                    e.path.insert(0, name)
+                    e.path.insert(0, '{' + name + '}')
                     raise
             return results
 

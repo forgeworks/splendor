@@ -265,13 +265,13 @@ class Api(Schematic):
     security = fields.List(map=True, items={'type': 'str'}, description='A declaration of which security mechanisms can be used across the API. The list of values includes alternative security requirement objects that can be used. Only one of the security requirement objects need to be satisfied to authorize a request. Individual operations can override this definition.')
     tags = fields.InstanceOf(Tag, repeated=True, description='A list of tags used by the specification with additional metadata. The order of the tags can be used to reflect on their order by the parsing tools. Not all tags that are used by the Operation Object must be declared. The tags that are not declared MAY be organized randomly or based on the tools\' logic. Each tag name in the list MUST be unique.')
     external_docs = fields.InstanceOf(ExternalDoc, description="A list of external doc objects to reference.")
-    url_prefix = fields.InstanceOf(PurePosixPath, export=False, description="The prefix that this API lives at in the flask App.")
-    collections = fields.InstanceOf(Collection, map=True, export=False, description="All collections registered to the api.")
+    _url_prefix = fields.InstanceOf(PurePosixPath, export=False, description="The prefix that this API lives at in the flask App.", default="/")
+    _collections = fields.InstanceOf(Collection, map=True, export=False, description="All collections registered to the api.")
 
     def register(self, app, options, first_registration=False):
-        self.url_prefix = PurePosixPath(options.get('url_prefix', ''))
+        self._url_prefix = PurePosixPath(options.get('url_prefix', '/'))
         for path, resource in self.paths.items():
-            path = self.url_prefix / path.lstrip('/')
+            path = self._url_prefix / path.lstrip('/')
 
             if isinstance(resource, type):
                 resource = resource()
@@ -280,7 +280,7 @@ class Api(Schematic):
             resource.register(app, options, first_registration=first_registration)
 
             if isinstance(resource, Collection):
-                self.collections[resource.name] = resource
+                self._collections[resource.name] = resource
 
     @property
     def name(self):
