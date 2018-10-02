@@ -726,7 +726,7 @@ class Format(Constraint):
             import rfc3987
         except ImportError:
             logging.warn("package rfc3987 missing - cannot validate uri - so it passes")
-            return true
+            return True
         return rfc3987.match(instance, rule='URI')
 
     def validate_uri_reference(self, instance):
@@ -734,7 +734,7 @@ class Format(Constraint):
             import rfc3987
         except ImportError:
             logging.warn("package rfc3987 missing - cannot validate uri-reference - so it passes")
-            return true
+            return True
         return rfc3987.match(instance, rule='URI_reference')
 
     def validate_iri(self, instance):
@@ -742,7 +742,7 @@ class Format(Constraint):
             import rfc3987
         except ImportError:
             logging.warn("package rfc3987 missing - cannot validate iri - so it passes")
-            return true
+            return True
         return rfc3987.match(instance, rule='IRI')
 
     def validate_iri_reference(self, instance):
@@ -750,6 +750,6 @@ class Format(Constraint):
             import rfc3987
         except ImportError:
             logging.warn("package rfc3987 missing - cannot validate iri-reference - so it passes")
-            return true
+            return True
         return rfc3987.match(instance, rule='IRI_reference')
 

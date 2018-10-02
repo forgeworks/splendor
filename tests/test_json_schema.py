@@ -558,6 +558,9 @@ def test_ip_addresses():
     assert not s.validate("1200::AB00:1234::2552:7777:1313")
 
 def test_uri():
+    # Skip this test if we don't have the rfc module.
+    pytest.importorskip('rfc3987')  
+
     s = schema({'type': 'string', 'format': 'uri'})
 
     assert s.validate("http://tools.ietf.org/html/rfc3986#appendix-A")
@@ -568,6 +571,9 @@ def test_uri():
     assert s.validate("urn:place/sub")
 
 def test_iri():
+    # Skip this test if we don't have the rfc module.
+    pytest.importorskip('rfc3987')  
+
     s = schema({'type': 'string', 'format': 'iri'})
 
     assert s.validate("http://tools.ietf.org/html/rfc3986#appendix-A")
