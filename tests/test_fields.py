@@ -45,3 +45,12 @@ def test_schema_field():
         schema = SchemaField()
 
     assert B(schema=A)
+
+
+def test_name():
+    class A(Schematic):
+        name = String()
+    
+    assert A.__schema__.name == 'splendor.A'
+
+    

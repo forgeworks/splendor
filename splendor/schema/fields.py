@@ -1,6 +1,8 @@
+import inspect, typing
+from uuid import uuid4
+
 from .base import Schema, Undefined, ValidationError
 from .native import system as native
-from uuid import uuid4
 
 """
     Field = Schema != Class || Type
@@ -43,7 +45,7 @@ class FieldSetupError(Exception):
         self.field = field
 
     def __str__(self):
-        return f'Error setting up field({self.name}), original error is: {self.original!r}'
+        return f'Error setting up field <{self.name}> -- original error is -- {self.original.__class__.__name__}: {self.original}'
 
 
 class Field:
@@ -51,7 +53,6 @@ class Field:
 
     meta = set(['repeated',
                 'map',
-                'required',
                 'deprecated',
                 'aliases',
                 'description',
@@ -62,68 +63,73 @@ class Field:
                 'name',
                 'primary_key',
                 'export',
-                'import'
+                'import',
                 'system'])
 
-    def __init__(self, **config):
+    def __init__(self, required=False, system=None, **config):
         self.config = config
         self.schema = None
-        self.default = Undefined
+        self.required = required
+        self.system = system
         self.order = self.__class__.order
         self.__class__.order += 1
-        self.setup( config.get('name', None), config.get('system', native) )
+        if system:
+            self.setup( config.get('name', None), system )
 
     def __call__(self, **config):
         config = dict(self.config, **config)
+        config.setdefault('required', self.required)
+        config.setdefault('system', self.system)
         return self.__class__(**config)
 
     # So that a field can be used as a schema
     @property
     def __schema__(self):
+        if self.schema is None:
+            self.setup(None, native)
         return self.schema
 
     def setup(self, name, system):
         self.name = name
         self.system = system
 
-        value = {}
+        schema_value = {}
+        meta = {}
         for k, v in self.config.items():
             name = system.name_inflection(k)
-            value[name] = v
-
-        self.default = self.config.get('default', Undefined)
+            if name in self.meta:
+                meta[name] = v
+            else:
+                schema_value[name] = v
 
         try:
             if 'repeated' in self.config:
-                meta = {'type': 'list'}
-                for k in self.meta:
-                    if k in value:
-                        meta[k] = value.pop(k)
-                meta['items'] = value
+                meta['type'] = 'list'
+                meta['items'] = schema_value
+                meta.setdefault('default', list)
                 self.schema = system.schema(meta)
-                self.default = self.default or list
+                self.default = meta.get('default', list)
             elif 'map' in self.config:
-                meta = {'type': 'dict'}
-                for k in self.meta:
-                    if k == 'default':
-                        continue
-                    if k in value:
-                        meta[k] = value.pop(k)
-                meta['additional_properties'] = value
+                meta['type'] = 'dict'
+                meta['additional_properties'] = schema_value
+                meta.setdefault('default', dict)
                 self.schema = system.schema(meta)
-                self.default = self.default or dict
             else:
-                self.schema = system.schema(value)
+                self.schema = system.schema(dict(schema_value, **meta))
         except Exception as e:
-            raise FieldSetupError(self, self.name, e)
+            raise
+            raise FieldSetupError(self, name, e)
+
+        return self.schema
 
     def get_default(self, obj):
-        if self.default is not Undefined:
-            if callable(self.default):
-                return self.default()
-            return self.default
-        else:
-            return Undefined
+        default = self.schema.value.get('default', Undefined)
+        if self.schema.value.get('type') != 'callable' and callable(default):
+            return default()
+        return default
+
+    def has_value(self, obj):
+        return self.name in obj.__dict__
 
     def __get__(self, obj, type=None):
         if obj is None:
@@ -172,62 +178,97 @@ def generate_schema_for_class(name, bases, namespace, system=None):
     else:
         value = {'type': 'object'}
 
-    system = namespace.get('__schema_namespace__', system)
+    system = namespace.get('__schema_system__', None)
+    fields = {}   # List of fields
+    default = value.get('default', {})    # Default value for an instance
+    default_inherited = {}
+    properties = {}
 
+    ### Inherited ###
     for base in bases:
         if hasattr(base, '__schema__') and base.__schema__:
-            value = dict(value, **base.__schema__.value)
+            value = dict(base.__schema__.value, **value)        # Merge parent schema with this one.  TODO: make better
             system = system or base.__schema__.system
-
-    system = system or native
-
-    new_values = {}
-    properties = {}
+            default_inherited.update(base.__schema__.value.get('default', {}))
+        if hasattr(base, '__fields__'):
+            fields.update(base.__fields__)
+    
+    ### Properties ###
     for k, v in namespace.items():
         if isinstance(v, Field):
-            v.setup(k, system)
-            properties[k] = v.schema
-        else:
-            if value is not Undefined:
-                new_values[k] = v
-
-    ## Validate New Values ###
-    old_schema = Schema(value, system=system or native)
-    namespace.update( old_schema(new_values, partial=True) )
+            fields[k] = v
+        elif value is Undefined:
+            # If the new class sets a field to Undefined, get rid of it
+            fields.pop(k, None)
     
+    for k, v in fields.items():
+        properties[k] = v.setup(k, system or native)
+
     if properties:
         value['properties'] = properties
+    
+    ### Default Values ###
+    # Merge given default and inherited
+    default = dict(default_inherited, **default)   
+    
+    # Add defaults from properties
+    for k, v in namespace.items():
+        if v is Undefined:
+            default.pop(None)
+        elif k in properties and not isinstance(v, Field):
+            default[k] = fields[k].schema(v)
+    
+    if default:
+        value['default'] = default
 
-    schema = Schema(value, system=system or native)
-    schema.name = name
+    schema = Schema(value, name=name, system=system or native)
 
-    return schema
+    ## Validate New Values ###
+    if default:
+        try:
+            value['default'] = schema(default, partial=True)
+        except ValidationError as e:
+            raise ValidationError("Default values for class %r did not validate against "
+                                  "its own schema, error was:\n%s" % (name, e))
+    
+    return fields, schema
 
 
-Schematic = None
+Schematic = None 
 
 class SchematicType(type):
     def __new__(cls, name, bases, namespace):
         schema = None
         if Schematic:
-            schema = namespace['__schema__'] = generate_schema_for_class(name, bases, namespace)
+            full_name = namespace.get('__schema_name__', inspect.getmodule(cls).__name__.split('.', 1)[0] + '.' + name)
+            fields, schema = generate_schema_for_class(full_name, bases, namespace)
+            namespace['__schema__'] = schema
+            namespace['__fields__'] = fields
         typ = type.__new__(cls, name, bases, namespace)
         if schema:
             schema.system.register_instancer(schema.name, typ)
         return typ
 
+class Schematic(metaclass=SchematicType):   # pylint: disable-msg=E0102
+    """
+    Construct that carries a schema (`__schema__`) and enforces its properties
+    to follow it.
+    """
+    __schema__ = None
+    __fields__ = []
 
-class Schematic(metaclass=SchematicType):
-    def __init__(self, __schematic_config__=None, **kwargs):
+    def __init__(self, __value__=None, **kwargs):
         super().__init__()
-        if __schematic_config__:
-            for k, v in __schematic_config__.items():
-                kwargs.setdefault(k, v)
-        for k, v in kwargs.items():
-            setattr(self, k, v)
+        value = {}
+        if self.__schema__:
+            value.update(self.__schema__.value.get('default', {}))
+        if __value__:
+            value.update(__value__)
+        value.update(kwargs)
+        self.set_schema_value(value)
         self.validate()
 
-    def __repr__(self):
+    def __repr__(self): 
         return f'{self.__class__.__name__}({self.__dict__!r})'
 
     def __eq__(self, other):
@@ -239,8 +280,102 @@ class Schematic(metaclass=SchematicType):
     def is_valid(self):
         return self.validate() is None
 
+    def get_schema(self):
+        return self.__schema__
+
+    def get_schema_value(self, ignore_default=False, ignore_empty=True, export=False):
+        """
+        Combines the schema-property values of this object with the inherited ones,
+        and returns it as a dict.
+
+        If `ignore_default` is `True` (default) properties with default values won't
+        be included.
+        """
+        value = {}
+        fields = self.__class__.__fields__
+        for k, field in fields.items():
+            if field.config.get('export') is False:
+                continue
+            if field.has_value(self):
+                v = getattr(self, k)
+            elif not ignore_default:
+                try:
+                    v = getattr(self, k)
+                except AttributeError:
+                    continue
+            else:
+                continue
+            if v or ignore_empty is False:
+                value[k] = v
+        return value
+
+    def set_schema_value(self, value):
+        self.__dict__ = self.__schema__(value)
+
+    def marshal_as(self, system, export=True):
+        if system is not 'json':
+            raise NotImplementedError("Marshalling is kinda fake right now, so we can only marshal to json")
+        return marshal_to_json(self.get_schema_value(export=export))
+    
+    @classmethod
+    def get_field(cls, k):
+        getattr(cls, k)
+
+
+def marshal_to_json(obj, export=True):
+    if isinstance(obj, Schematic):
+        return obj.marshal_as('json', export)
+    elif isinstance(obj, Schema):
+        return marshal_to_json(obj.config, export)
+    elif isinstance(obj, typing.Mapping):
+        return {k: marshal_to_json(v, export) for k, v in obj.items()}
+    elif isinstance(obj, str):
+        return obj
+    elif isinstance(obj, bytes):
+        return obj.decode('utf-8')
+    elif isinstance(obj, float):
+        return obj
+    elif isinstance(obj, int):
+        return obj
+    elif isinstance(obj, bool):
+        return obj
+    elif obj is None:
+        return None
+    elif isinstance(obj, typing.Iterable):
+        return [marshal_to_json(v, export) for v in obj]
+    return str(obj)
+
+
+def transform_schema_value(schematic, value, ignore_default=True):
+    if isinstance(value, Schematic):
+        return value.get_schema_properties(ignore_default)
+
+    elif isinstance(value, dict):
+        for k, v in value.items():
+            v = transform_schema_value(schematic, v, ignore_default=True)
+            if v is Undefined:
+                continue
+            if k in schematic.__fields__:
+                pass
+            if isinstance(v, Schematic):
+                props[k] = v.get_schema_properties()
+            elif v is Undefined or v == [] or v == {}:
+                del props[k]
+
+    result = {}
+    for k, v in values.items():
+        if isinstance(v, Schematic):
+            props[k] = v.get_schema_properties()
+        elif v is Undefined or v == [] or v == {}:
+            del props[k]
+
+
 
 class Configurable(Schematic):
+    """
+    A Schematic that can be reconfigured by calling it as a function with
+    new schema-properties.  This returns a new instance.
+    """
     def __call__(self, **value):
         return self.__class__(**dict(self.__schema__.value, **value))
 
@@ -265,6 +400,9 @@ def AnyOf(t, **kwargs):
 def InstanceOf(t, **kwargs):
     return Object(instance_of=t, **kwargs)
 
+def SubclassOf(t, **kwargs):
+    return Object(subclass_of=t, **kwargs)
+
 def AnyInstanceOf(types, **kwargs):
     return Field(any_of=[InstanceOf(t) for t in types], **kwargs)
 
@@ -272,7 +410,7 @@ def Enum(choices, **kwargs):
     return String(enum=choices, **kwargs)
 
 def Duck(t, **kwargs):
-    return Object(has_attrs=t, **kwargs)
+    return Object(required=t, **kwargs)
 
 def SchemaField(**kwargs):
     return Field(schema_value=True, **kwargs)

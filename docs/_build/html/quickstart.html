@@ -1,0 +1,241 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Quick Start &#8212; Splendor 0.0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="APIs" href="api.html" />
+    <link rel="prev" title="Installation" href="installation.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="quick-start">
+<h1>Quick Start<a class="headerlink" href="#quick-start" title="Permalink to this headline">¶</a></h1>
+<p>Here we go.</p>
+<p>We assume you have gone through the Flask and Splendor <a class="reference internal" href="installation.html"><span class="doc">Installation</span></a>.</p>
+<div class="section" id="a-minimal-api">
+<h2>A Minimal API<a class="headerlink" href="#a-minimal-api" title="Permalink to this headline">¶</a></h2>
+<p>We create two files, both alike in dignity, one <cite>api_v1.py</cite>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">splendor</span> <span class="k">import</span> <span class="n">Api</span>
+
+<span class="k">def</span> <span class="nf">hello</span><span class="p">():</span>
+    <span class="k">return</span> <span class="s2">&quot;Hello World!&quot;</span>
+
+<span class="k">class</span> <span class="nc">GreetingV1</span><span class="p">(</span><span class="n">Api</span><span class="p">):</span>
+    <span class="n">info</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;title&#39;</span><span class="p">:</span> <span class="s1">&#39;Greeting API&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;version&#39;</span><span class="p">:</span> <span class="s1">&#39;1.0.0&#39;</span>
+    <span class="p">}</span>
+    <span class="n">paths</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;/hello&#39;</span><span class="p">:</span> <span class="n">hello</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<p>Let’s review:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li>We create our greeting function <cite>hello_world</cite>, which simply returns a string: <cite>Hello World</cite></li>
+<li>Next we define our API, give it a title and a version, both required.</li>
+<li>We also define our single path <cite>/hello</cite>, which routes to our <cite>hello_world</cite> function.  This function is automatically wrapped as a GET Operation.</li>
+</ol>
+</div></blockquote>
+<p>Next a Flask file, called <cite>app.py</cite>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">flask</span> <span class="k">import</span> <span class="n">Flask</span>
+<span class="kn">from</span> <span class="nn">api_v1</span> <span class="k">import</span> <span class="n">GreetingV1</span>
+
+<span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">app</span><span class="o">.</span><span class="n">register_blueprint</span><span class="p">(</span><span class="n">GreetingV1</span><span class="p">(),</span> <span class="n">url_prefix</span><span class="o">=</span><span class="s1">&#39;/v1&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Here we simply create a Flask App, like you might in the <a class="reference external" href="http://flask.pocoo.org/docs/1.0/quickstart/">Flask Quick Start</a>, and we register
+our API as one would a blueprint, giving it a URL prefix at <cite>/v1</cite>, since it is version one of our
+API.</p>
+<p>We run our app exactly like Flask:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ export FLASK_APP=app.py
+$ flask run
+ * Running on http://127.0.0.1:5000/
+</pre></div>
+</div>
+<p>Now open the browser to <a class="reference external" href="http://127.0.0.1:5000/v1/hello">http://127.0.0.1:5000/v1/hello</a> to see
+our operation in action.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Windows users might need to see <a class="reference external" href="http://flask.pocoo.org/docs/1.0/quickstart/">Flask Quick Start</a> on how to run the app.</p>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>Having trouble?  If you’re getting a 404 error, you might not be going to the full
+url: <a class="reference external" href="http://127.0.0.1:5000/v1/hello">http://127.0.0.1:5000/v1/hello</a></p>
+<p class="last">Otherwise, check out <a class="reference external" href="http://flask.pocoo.org/docs/1.0/quickstart/">Flask Quick Start</a> for troubleshooting.</p>
+</div>
+</div>
+<div class="section" id="live-docs">
+<h2>Live Docs<a class="headerlink" href="#live-docs" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><a class="reference internal image-reference" href="_images/minimal-swagger.png"><img alt="_images/minimal-swagger.png" src="_images/minimal-swagger.png" style="width: 388.0px; height: 294.40000000000003px;" /></a>
+</div></blockquote>
+<p>Now that our api is running, we can check out it’s live documentation.</p>
+<p>The <strong>OpenAPI</strong> JSON file, which can be imported directly into something like Postman or SwaggerHub, is by default available at:</p>
+<blockquote>
+<div><a class="reference external" href="http://127.0.0.1:5000/v1/openapi.json">http://127.0.0.1:5000/v1/openapi.json</a></div></blockquote>
+<p><strong>Swagger</strong> is, by default, viewable at:</p>
+<blockquote>
+<div><a class="reference external" href="http://127.0.0.1:5000/v1/swagger">http://127.0.0.1:5000/v1/swagger</a></div></blockquote>
+<p>Both of these paths can be changed on the <cite>Api</cite> object definition.</p>
+</div>
+<div class="section" id="a-new-version">
+<h2>A New Version<a class="headerlink" href="#a-new-version" title="Permalink to this headline">¶</a></h2>
+<p>Our user’s are pretty happy with our greeting API, but “world” is just so generic, and they’d
+really like to be able to customize that.  Also they want a JSON object instead of just a string.
+And finally, they agree <cite>/hello</cite> needs to be the endpoint, and that it can’t change, because…
+well because it helps me write this tutorial.  Nice folks.</p>
+<p>This is a breaking change, our legacy users will not be able to use the new system.  So
+we are forced to create a new version, and since it’s not backwards compatible, it should be a new
+major version.</p>
+<p>So let’s create a new file, <cite>api_v2.py</cite>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">splendor</span> <span class="k">import</span> <span class="n">Api</span><span class="p">,</span> <span class="n">QueryString</span>
+<span class="kn">from</span> <span class="nn">splendor.schema</span> <span class="k">import</span> <span class="n">json</span>
+
+<span class="k">def</span> <span class="nf">hello</span><span class="p">(</span><span class="n">target</span><span class="p">:</span><span class="n">QueryString</span><span class="p">())</span> <span class="o">-&gt;</span> <span class="n">json</span><span class="o">.</span><span class="n">Object</span><span class="p">:</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;target&#39;</span><span class="p">:</span> <span class="n">target</span><span class="p">,</span>
+            <span class="s1">&#39;greeting&#39;</span><span class="p">:</span> <span class="n">f</span><span class="s1">&#39;Hello </span><span class="si">{target}</span><span class="s1">!&#39;</span><span class="p">}</span>
+
+<span class="k">class</span> <span class="nc">GreetingV2</span><span class="p">(</span><span class="n">Api</span><span class="p">):</span>
+    <span class="n">info</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;title&#39;</span><span class="p">:</span> <span class="s1">&#39;Greeting API&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;version&#39;</span><span class="p">:</span> <span class="s1">&#39;2.0.0&#39;</span>
+    <span class="p">}</span>
+    <span class="n">paths</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;/hello&#39;</span><span class="p">:</span> <span class="n">hello</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<p>Most of what we’re doing is the same, but note we are using a few new Python 3 features,
+specifically we add type hinting to our function: We say that the new <cite>target</cite> parameter
+should be a <cite>QueryString</cite>, and that the function should return a JSON object.</p>
+<p>When the Api takes the <cite>hello_anything</cite> function as a <cite>PathItem</cite>, it will wrap it in an Operation,
+which gleans information from the function to properly configure itself.  By providing some type
+hints, we tell Splendor where to get the parameters and how to build a Flask Response with the data
+returned from the function.  All of this is automatically reflected in our OpenApi spec / Swagger
+documentation so that our users have no ambiguity on our new feature.</p>
+<p>Finally, we update <cite>app.py</cite> with our new version:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">flask</span> <span class="k">import</span> <span class="n">Flask</span>
+<span class="kn">from</span> <span class="nn">api_v1</span> <span class="k">import</span> <span class="n">GreetingV1</span>
+<span class="kn">from</span> <span class="nn">api_v2</span> <span class="k">import</span> <span class="n">GreetingV2</span>
+
+<span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">app</span><span class="o">.</span><span class="n">register_blueprint</span><span class="p">(</span><span class="n">GreetingV1</span><span class="p">(),</span> <span class="n">url_prefix</span><span class="o">=</span><span class="s1">&#39;/v1&#39;</span><span class="p">)</span>
+<span class="n">app</span><span class="o">.</span><span class="n">register_blueprint</span><span class="p">(</span><span class="n">GreetingV2</span><span class="p">(),</span> <span class="n">url_prefix</span><span class="o">=</span><span class="s1">&#39;/v2&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Note that we still have all the functions and features at <cite>/v1</cite>, all of our past code, bugs
+and all, is still available to legacy users so they don’t need to upgrade or touch anything.  We can
+still support this major version with bug fixes, even new features, keeping the same codebase without
+forking, and new users can focus on <cite>/v2</cite>.</p>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">Splendor</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">APIs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema.html">Schema</a></li>
+<li class="toctree-l1"><a class="reference internal" href="collections.html">Collections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="versioning.html">Versioning</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="organic.html">Organic Development</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="installation.html" title="previous chapter">Installation</a></li>
+      <li>Next: <a href="api.html" title="next chapter">APIs</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, ForgeWorks.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.8.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/quickstart.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

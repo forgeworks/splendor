@@ -18,8 +18,10 @@ def post(url):
 
 class House(fields.Schematic):
     id = fields.UUID(primary_key=True)
-    name = fields.String
+    name = fields.String(required=True)
     zip = fields.String(max_length=6)
+    _url = fields.String(write_only=True)
+
 
 
 ### Collections / Schemas ###
@@ -38,6 +40,7 @@ def houses():
 
         def enrich(self, key, house):
             house = super().enrich(key, house)
+            house._url = f'{self.url_prefix}/{key.id}'
             return house
 
         def open_the_house_door(self, key):
@@ -50,7 +53,7 @@ def test_collection_sanity(houses):
     class HouseCollection(Collection):
         schema = House
 
-    assert HouseCollection.schema.system is not None
+    #assert HouseCollection.schema.system is not None
 
 
 def test_get(app, client, houses):
@@ -63,7 +66,7 @@ def test_get(app, client, houses):
     assert isinstance(app.view_functions[get_house.endpoint], Operation)
 
     house = House(name='Cottage 1')
-    houses.save(['House', '1'], house)
+    houses.save(['splendor.House', '1'], house)
 
     r = client.get('/houses/1')
     assert r.status_code == 200
@@ -98,7 +101,7 @@ def test_post(app, client, houses):
     assert isinstance(app.view_functions[post_house.endpoint], Operation)
 
     house = House(name="Cottage X")
-
+    
     r = client.post('/houses', json=vars(house))
     assert r.status_code == 200
     assert r.json['_url'].startswith('/houses/')
@@ -116,7 +119,7 @@ def test_patch(app, client, houses):
     assert isinstance(app.view_functions[patch_house.endpoint], Operation)
 
     house = House(name='Cottage 1', zip='60650')
-    houses.save(['House', '1'], house)
+    houses.save(['splendor.House', '1'], house)
 
     r = client.patch('/houses/1', json={'zip': '90210'})
     assert r.status_code == 200

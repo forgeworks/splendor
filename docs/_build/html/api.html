@@ -1,0 +1,299 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>APIs &#8212; Splendor 0.0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Schema" href="schema.html" />
+    <link rel="prev" title="Quick Start" href="quickstart.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="apis">
+<h1>APIs<a class="headerlink" href="#apis" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="open-api">
+<h2>Open API<a class="headerlink" href="#open-api" title="Permalink to this headline">¶</a></h2>
+<p>The <a class="reference external" href="https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md">Open API</a> specification is a standard for describing a web service in such a way as to make
+discovery of it trivial.  It is used by tools like Swagger to quickly integrate with your system.</p>
+<p>For our purposes, we use it as a base for our architecture.  Splendor API classes are made to mirror
+the Open API version 3 spec.  Where the Open API spec defines an <a class="reference external" href="https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.2.md#info-object">Info</a> object, Splendor defines
+an Info class.</p>
+<p>This allows us two primary features.  Firstly, we get a well thought out and comprehensive
+architecture that is well structured, yet general enough for almost any case.  Secondly, we are
+able to directly translate our service into the OpenAPI spec, allowing us integration with a wide
+array of services and, importantly documentation generating services that let us communicate our
+API while we build it.</p>
+</div>
+<div class="section" id="splendor-api-class">
+<h2>Splendor Api Class<a class="headerlink" href="#splendor-api-class" title="Permalink to this headline">¶</a></h2>
+<p>Normally in Flask, we would define our endpoints via a route like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">flask</span> <span class="k">import</span> <span class="n">Flask</span><span class="p">,</span> <span class="n">jsonify</span>
+<span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="nd">@app</span><span class="o">.</span><span class="n">route</span><span class="p">(</span><span class="s1">&#39;/pets/&lt;id&gt;&#39;</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">get_pet</span><span class="p">(</span><span class="nb">id</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">jsonify</span><span class="p">(</span> <span class="n">get_pet_data</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span> <span class="p">)</span>
+
+<span class="o">...</span> <span class="c1"># Define the rest of our endpoints.</span>
+</pre></div>
+</div>
+<p>It’s quick, it’s simple, it’s Flask, and it’s fine, but it really doesn’t do much for your users
+unless they know how it works.  Developers trying to use your service will need to either crack open
+the code, or get a description from you in some other way, usually, let’s face it, a Slack message
+or an email.  Documentation is always the last thing.</p>
+<p>But in Splendor, we define declaratively, building our API:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">splendor</span> <span class="k">import</span> <span class="n">Api</span>
+
+<span class="k">def</span> <span class="nf">get_pet</span><span class="p">(</span><span class="nb">id</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">jsonify</span><span class="p">(</span> <span class="n">get_pet_data</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span> <span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">PetService</span><span class="p">(</span><span class="n">Api</span><span class="p">):</span>
+    <span class="n">info</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;title&#39;</span><span class="p">:</span> <span class="s1">&#39;Pet Service&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;version&#39;</span><span class="p">:</span> <span class="s1">&#39;1.0.0&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;description&#39;</span><span class="p">:</span> <span class="s1">&#39;This is an *example* API.&#39;</span>
+    <span class="p">}</span>
+    <span class="n">paths</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;/pets/&lt;id&gt;&#39;</span><span class="p">:</span> <span class="n">get_pet</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<p>Most of this is self explanatory.  We have two main sections defined, <code class="docutils literal notranslate"><span class="pre">info</span></code> and <code class="docutils literal notranslate"><span class="pre">paths</span></code>.  The info
+section is necessary, it describes our API in its most basic terms.  In it we can define other
+properties like <code class="docutils literal notranslate"><span class="pre">license</span></code>, <code class="docutils literal notranslate"><span class="pre">contact</span></code>, etc.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">paths</span></code> section maps urls to functions, operations, collections, or other paths.  When you
+supply just a naked function, it wraps it as GET Operation.  If you wanted to instead respond to a
+POST request, you would do the following:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">PetService</span><span class="p">(</span><span class="n">Api</span><span class="p">):</span>
+    <span class="o">...</span>
+
+    <span class="n">paths</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;/pets&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;POST&#39;</span><span class="p">:</span> <span class="n">post_a_pet</span><span class="p">}</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<p>And in fact, you can continue with other request methods and further paths:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">PetService</span><span class="p">(</span><span class="n">Api</span><span class="p">):</span>
+    <span class="o">...</span>
+
+    <span class="n">paths</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;/pets&#39;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s1">&#39;GET&#39;</span><span class="p">:</span> <span class="n">list_pets</span><span class="p">,</span>
+            <span class="s1">&#39;POST&#39;</span><span class="p">:</span> <span class="n">post_pet</span>
+        <span class="p">},</span>
+        <span class="s1">&#39;/pets/&lt;id&gt;&#39;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s1">&#39;PUT&#39;</span><span class="p">:</span> <span class="n">put_pet</span><span class="p">,</span>
+            <span class="s1">&#39;GET&#39;</span><span class="p">:</span> <span class="n">get_pet</span><span class="p">,</span>
+            <span class="s1">&#39;DELETE&#39;</span><span class="p">:</span> <span class="n">delete_pet</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The Api class is a <em>Schematic</em>, which is a class that lets us quickly define properties on an
+object or class.  See <a class="reference internal" href="schema.html#schema"><span class="std std-ref">Schema</span></a> for more information.</p>
+</div>
+</div>
+<div class="section" id="flask-integration">
+<h2>Flask Integration<a class="headerlink" href="#flask-integration" title="Permalink to this headline">¶</a></h2>
+<p>We integrate with Flask very simply, just register the API object as you would a blueprint, with
+a <code class="docutils literal notranslate"><span class="pre">url_prefix</span></code> if you like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">flask</span> <span class="k">import</span> <span class="n">Flask</span>
+<span class="kn">from</span> <span class="nn">api_v1</span> <span class="k">import</span> <span class="n">PetService</span>
+
+<span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">app</span><span class="o">.</span><span class="n">register_blueprint</span><span class="p">(</span><span class="n">PetService</span><span class="p">(),</span> <span class="n">url_prefix</span><span class="o">=</span><span class="s1">&#39;/v1&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>And in our operation functions, we still have all the power of Flask, our thread-local <code class="docutils literal notranslate"><span class="pre">request</span></code>
+object, <code class="docutils literal notranslate"><span class="pre">current_app</span></code>, etc.  Further, if something cannot be readily defined in Splendor objects,
+it’s easy enough to drop back down generic Flask endpoints for custom functionality.</p>
+</div>
+<div class="section" id="live-docs">
+<h2>Live Docs<a class="headerlink" href="#live-docs" title="Permalink to this headline">¶</a></h2>
+<p>Because of our well-defined API, we can generate two important endpoints automatically:</p>
+<blockquote>
+<div><ul class="simple">
+<li><code class="docutils literal notranslate"><span class="pre">/openapi.json</span></code>: Your service definition file in the Open API specification.  This link is what you use to integrate with Swagger or a similar tool.</li>
+<li><code class="docutils literal notranslate"><span class="pre">/swagger</span></code>: A web UI to browse your service’s definition.</li>
+</ul>
+</div></blockquote>
+<p>If you wish to change these paths, you can add an attribute to your <code class="docutils literal notranslate"><span class="pre">Api</span></code> object, <code class="docutils literal notranslate"><span class="pre">spec_path</span></code> and
+<code class="docutils literal notranslate"><span class="pre">swagger_path</span></code>.  Or set them to None to disable this feature.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The above URLs are relative to the API <code class="docutils literal notranslate"><span class="pre">url_prefix</span></code>, so if you registered your API at “/v1”,
+then the Swagger endpoint would be something like: <a class="reference external" href="http://127.0.0.1:5000/v1/swagger">http://127.0.0.1:5000/v1/swagger</a></p>
+</div>
+</div>
+<div class="section" id="operations">
+<h2>Operations<a class="headerlink" href="#operations" title="Permalink to this headline">¶</a></h2>
+<p>All of our endpoint functions within the Api definition are wrapped as Operation objects. Operations
+define the basic inputs and outputs of a given endpoint as well as the metadata and documentation.</p>
+<p>If given just a naked function, Splendor wraps it as an GET Operation, which is to say an
+Operation with the <code class="docutils literal notranslate"><span class="pre">method</span></code> property set to ‘GET’.  But we can alter this by defining more
+information through a decorator:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">splendor</span> <span class="k">import</span> <span class="n">operation</span>
+<span class="kn">from</span> <span class="nn">splendor.schema</span> <span class="k">import</span> <span class="n">Any</span>
+
+<span class="nd">@operation</span><span class="p">(</span><span class="n">summary</span><span class="o">=</span><span class="s1">&#39;Post An Pet&#39;</span><span class="p">,</span>
+           <span class="n">method</span><span class="o">=</span><span class="s1">&#39;POST&#39;</span><span class="p">,</span>
+           <span class="n">tags</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;pets&#39;</span><span class="p">],</span>
+           <span class="n">body</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;description&#39;</span><span class="p">:</span> <span class="s1">&#39;Pet item to post&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;arg&#39;</span><span class="p">:</span> <span class="s1">&#39;pet&#39;</span><span class="p">,</span>       <span class="c1"># The name of the variable</span>
+                                    <span class="c1"># injected into the function</span>
+                <span class="s1">&#39;content&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;application/json&#39;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s1">&#39;schema&#39;</span><span class="p">:</span> <span class="n">Any</span>
+                    <span class="p">}</span>
+                <span class="p">}</span>
+           <span class="p">},</span>
+           <span class="n">responses</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;200&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;description&#39;</span><span class="p">:</span>
+                        <span class="s1">&#39;Pet item that was added.&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;content&#39;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s1">&#39;application/json&#39;</span><span class="p">:</span> <span class="p">{</span>
+                            <span class="s1">&#39;schema&#39;</span><span class="p">:</span> <span class="n">Any</span>
+                        <span class="p">}</span>
+                    <span class="p">}</span>
+                <span class="p">}</span>
+            <span class="p">},</span>
+            <span class="n">security</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s1">&#39;pets_auth&#39;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s1">&#39;write:pets&#39;</span><span class="p">,</span>
+                    <span class="s1">&#39;read:pets&#39;</span>
+                <span class="p">}</span>
+            <span class="p">})</span>
+<span class="k">def</span> <span class="nf">post_pet</span><span class="p">(</span><span class="n">pet</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Posts a Pet item to the pets datastore.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="o">...</span> <span class="c1"># Do something with the data</span>
+</pre></div>
+</div>
+<p>This is a lot to parse at first, and not all of it is required, but let’s break it down:</p>
+<ol class="arabic simple">
+<li>First we provide a <cite>summary</cite>, which is like a name or a short description.</li>
+<li>Next we give it our HTTP request method we expect the function to respond to.</li>
+<li>Then some tags, which are simply used for searching our API.</li>
+<li>Next we define our <cite>body</cite>, which lets your users know what sort of data should be put in the request body.  Here we say it’s some arbitrary JSON, with a schema of anything.  Ideally, we would define our schema, but we’ll get to that later.</li>
+<li>We now define what the user can expect to get as a return object.  In this case, they will get a 200 OK response that contains a JSON document of the Pet item that was added.</li>
+<li>Then we define our <cite>security</cite> parameter, which will tell the system what sort of OAuth tags are needed to perform the operation.</li>
+<li>Finally, we define our actual function.  The parameter <cite>pet</cite> is used, as per our body’s <cite>arg</cite> property.  Also, the <cite>description</cite> property for our operation gets set to our docstring.</li>
+</ol>
+<p>Phew, that was a lot.  But now we have a fully defined operation that leaves very little ambiguity
+to the end developer.  A front-end engineer, for instance would be able to take this endpoint
+and run with it, knowing exactly what to expect.</p>
+<p>If you are reeling a bit that you’ll have to do this to every endpoint in your system, read on to
+the following sections, and you will find ways to mitigate the boiler plate.  A main design goal of
+Splendor is to provide ways to maximize the expression of your API with a minimum of code.</p>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">Splendor</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">APIs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema.html">Schema</a></li>
+<li class="toctree-l1"><a class="reference internal" href="collections.html">Collections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="versioning.html">Versioning</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="organic.html">Organic Development</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="quickstart.html" title="previous chapter">Quick Start</a></li>
+      <li>Next: <a href="schema.html" title="next chapter">Schema</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, ForgeWorks.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.8.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/api.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

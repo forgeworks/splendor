@@ -1,0 +1,600 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>splendor.schema.fields &#8212; Splendor 0.0.1 documentation</title>
+    <link rel="stylesheet" href="../../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for splendor.schema.fields</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">inspect</span><span class="o">,</span> <span class="nn">typing</span>
+<span class="kn">from</span> <span class="nn">uuid</span> <span class="k">import</span> <span class="n">uuid4</span>
+
+<span class="kn">from</span> <span class="nn">.base</span> <span class="k">import</span> <span class="n">Schema</span><span class="p">,</span> <span class="n">Undefined</span><span class="p">,</span> <span class="n">ValidationError</span>
+<span class="kn">from</span> <span class="nn">.native</span> <span class="k">import</span> <span class="n">system</span> <span class="k">as</span> <span class="n">native</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Field = Schema != Class || Type</span>
+
+<span class="sd">    Constraints are descriptions of data.</span>
+<span class="sd">    Schemas are collections of constraints.</span>
+<span class="sd">    Types are classifications for the interpreter/compiler.</span>
+
+<span class="sd">    A class can have a schema.</span>
+<span class="sd">    A class can have many fields.</span>
+<span class="sd">    Fields are schemas that are descriptors on a class as well as a schema property.</span>
+
+<span class="sd">    A field should match the interface of a schema perfectly.</span>
+<span class="sd">    A schema optionally has a name, a field MUST have a name after it&#39;s class is compiled,</span>
+<span class="sd">    this allows it to act as a descriptor.</span>
+
+<span class="sd">    A schema can compile itself in order to maximize its efficiency.</span>
+<span class="sd">    A schema is given its system at compile time.</span>
+<span class="sd">    </span>
+<span class="sd">    A constraint is immutable, it can compile itself at __init__, but not in a </span>
+<span class="sd">    separate step.  It must be given a schema (with a system) to create.</span>
+
+<span class="sd">    After a schema is compiled, if a constraint is changed, the whole schema MUST be recompiled.</span>
+
+<span class="sd">    Changing a schema MAY be through a migration, which is a transformation from</span>
+<span class="sd">    one version of a schema to another.</span>
+
+<span class="sd">    Both schemas and constraints instances MUST have a system which provides services and registrations</span>
+<span class="sd">    for objects within it.  Schemas and constaints are registered to a system.</span>
+
+<span class="sd">    A Schematic is a class that has a schema and field descriptors.  This makes the class validate</span>
+<span class="sd">    itself as its attributes are changed.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+
+<span class="k">class</span> <span class="nc">FieldSetupError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">original</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">original</span> <span class="o">=</span> <span class="n">original</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">field</span> <span class="o">=</span> <span class="n">field</span>
+
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">f</span><span class="s1">&#39;Error setting up field &lt;</span><span class="si">{self.name}</span><span class="s1">&gt; -- original error is -- </span><span class="si">{self.original.__class__.__name__}</span><span class="s1">: </span><span class="si">{self.original}</span><span class="s1">&#39;</span>
+
+
+<span class="k">class</span> <span class="nc">Field</span><span class="p">:</span>
+    <span class="n">order</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="n">meta</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span><span class="s1">&#39;repeated&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;map&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;deprecated&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;aliases&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;description&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;title&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;read_only&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;write_only&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;default&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;name&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;primary_key&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;export&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;import&#39;</span><span class="p">,</span>
+                <span class="s1">&#39;system&#39;</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">system</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">config</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">schema</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">required</span> <span class="o">=</span> <span class="n">required</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">system</span> <span class="o">=</span> <span class="n">system</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="n">order</span>
+        <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="n">order</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">system</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">setup</span><span class="p">(</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="n">system</span> <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">config</span><span class="p">):</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">,</span> <span class="o">**</span><span class="n">config</span><span class="p">)</span>
+        <span class="n">config</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;required&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">required</span><span class="p">)</span>
+        <span class="n">config</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;system&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">system</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">(</span><span class="o">**</span><span class="n">config</span><span class="p">)</span>
+
+    <span class="c1"># So that a field can be used as a schema</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">__schema__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">schema</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">setup</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">native</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">schema</span>
+
+    <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">system</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">system</span> <span class="o">=</span> <span class="n">system</span>
+
+        <span class="n">schema_value</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">meta</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">system</span><span class="o">.</span><span class="n">name_inflection</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">:</span>
+                <span class="n">meta</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">schema_value</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s1">&#39;repeated&#39;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">:</span>
+                <span class="n">meta</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;list&#39;</span>
+                <span class="n">meta</span><span class="p">[</span><span class="s1">&#39;items&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">schema_value</span>
+                <span class="n">meta</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;default&#39;</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">schema</span> <span class="o">=</span> <span class="n">system</span><span class="o">.</span><span class="n">schema</span><span class="p">(</span><span class="n">meta</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">default</span> <span class="o">=</span> <span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;default&#39;</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="s1">&#39;map&#39;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="p">:</span>
+                <span class="n">meta</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;dict&#39;</span>
+                <span class="n">meta</span><span class="p">[</span><span class="s1">&#39;additional_properties&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">schema_value</span>
+                <span class="n">meta</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;default&#39;</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">schema</span> <span class="o">=</span> <span class="n">system</span><span class="o">.</span><span class="n">schema</span><span class="p">(</span><span class="n">meta</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">schema</span> <span class="o">=</span> <span class="n">system</span><span class="o">.</span><span class="n">schema</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">schema_value</span><span class="p">,</span> <span class="o">**</span><span class="n">meta</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span>
+            <span class="k">raise</span> <span class="n">FieldSetupError</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">schema</span>
+
+    <span class="k">def</span> <span class="nf">get_default</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+        <span class="n">default</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">schema</span><span class="o">.</span><span class="n">value</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;default&#39;</span><span class="p">,</span> <span class="n">Undefined</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">callable</span><span class="p">(</span><span class="n">default</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">default</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">default</span>
+
+    <span class="k">def</span> <span class="nf">has_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">obj</span><span class="o">.</span><span class="vm">__dict__</span>
+
+    <span class="k">def</span> <span class="nf">__get__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">obj</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">Undefined</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="n">Undefined</span><span class="p">:</span>
+            <span class="n">default</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_default</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">Undefined</span><span class="p">:</span>
+                <span class="n">obj</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">default</span>
+                <span class="k">return</span> <span class="n">default</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%r</span><span class="s2"> object has no value for field </span><span class="si">%r</span><span class="s2">, and no default is defined&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span> <span class="nf">__set__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="n">Undefined</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="fm">__delete__</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">obj</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">schema</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">__delete__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+        <span class="n">obj</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">get_fields</span><span class="p">(</span><span class="nb">type</span><span class="p">):</span>
+    <span class="n">fields</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="nb">vars</span><span class="p">(</span><span class="nb">type</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">Field</span><span class="p">):</span>
+            <span class="n">fields</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span>
+    <span class="k">return</span> <span class="n">fields</span>
+
+
+<span class="k">def</span> <span class="nf">get_field_values</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">export</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="n">properties</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">get_fields</span><span class="p">(</span><span class="n">instance</span><span class="o">.</span><span class="vm">__class__</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">export</span> <span class="ow">is</span> <span class="kc">True</span> <span class="ow">and</span> <span class="n">field</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;export&#39;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">Undefined</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">Undefined</span><span class="p">:</span>
+            <span class="n">properties</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;PROPERTIES&quot;</span><span class="p">,</span> <span class="n">properties</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">properties</span>
+
+
+<span class="k">def</span> <span class="nf">generate_schema_for_class</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">system</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">if</span> <span class="s1">&#39;__schema__&#39;</span> <span class="ow">in</span> <span class="n">namespace</span><span class="p">:</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">namespace</span><span class="p">[</span><span class="s1">&#39;__schema__&#39;</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;type&#39;</span><span class="p">:</span> <span class="s1">&#39;object&#39;</span><span class="p">}</span>
+
+    <span class="n">system</span> <span class="o">=</span> <span class="n">namespace</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;__schema_system__&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">fields</span> <span class="o">=</span> <span class="p">{}</span>   <span class="c1"># List of fields</span>
+    <span class="n">default</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;default&#39;</span><span class="p">,</span> <span class="p">{})</span>    <span class="c1"># Default value for an instance</span>
+    <span class="n">default_inherited</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">properties</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="c1">### Inherited ###</span>
+    <span class="k">for</span> <span class="n">base</span> <span class="ow">in</span> <span class="n">bases</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">base</span><span class="p">,</span> <span class="s1">&#39;__schema__&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">base</span><span class="o">.</span><span class="n">__schema__</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="n">__schema__</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="o">**</span><span class="n">value</span><span class="p">)</span>        <span class="c1"># Merge parent schema with this one.  TODO: make better</span>
+            <span class="n">system</span> <span class="o">=</span> <span class="n">system</span> <span class="ow">or</span> <span class="n">base</span><span class="o">.</span><span class="n">__schema__</span><span class="o">.</span><span class="n">system</span>
+            <span class="n">default_inherited</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="n">__schema__</span><span class="o">.</span><span class="n">value</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;default&#39;</span><span class="p">,</span> <span class="p">{}))</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">base</span><span class="p">,</span> <span class="s1">&#39;__fields__&#39;</span><span class="p">):</span>
+            <span class="n">fields</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="n">__fields__</span><span class="p">)</span>
+    
+    <span class="c1">### Properties ###</span>
+    <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">namespace</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">Field</span><span class="p">):</span>
+            <span class="n">fields</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+        <span class="k">elif</span> <span class="n">value</span> <span class="ow">is</span> <span class="n">Undefined</span><span class="p">:</span>
+            <span class="c1"># If the new class sets a field to Undefined, get rid of it</span>
+            <span class="n">fields</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    
+    <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">fields</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">properties</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">setup</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">system</span> <span class="ow">or</span> <span class="n">native</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">properties</span><span class="p">:</span>
+        <span class="n">value</span><span class="p">[</span><span class="s1">&#39;properties&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">properties</span>
+    
+    <span class="c1">### Default Values ###</span>
+    <span class="c1"># Merge given default and inherited</span>
+    <span class="n">default</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">default_inherited</span><span class="p">,</span> <span class="o">**</span><span class="n">default</span><span class="p">)</span>   
+    
+    <span class="c1"># Add defaults from properties</span>
+    <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">namespace</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">v</span> <span class="ow">is</span> <span class="n">Undefined</span><span class="p">:</span>
+            <span class="n">default</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">properties</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">Field</span><span class="p">):</span>
+            <span class="n">default</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">fields</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">schema</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="n">default</span><span class="p">:</span>
+        <span class="n">value</span><span class="p">[</span><span class="s1">&#39;default&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">default</span>
+
+    <span class="n">schema</span> <span class="o">=</span> <span class="n">Schema</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">system</span><span class="o">=</span><span class="n">system</span> <span class="ow">or</span> <span class="n">native</span><span class="p">)</span>
+
+    <span class="c1">## Validate New Values ###</span>
+    <span class="k">if</span> <span class="n">default</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">value</span><span class="p">[</span><span class="s1">&#39;default&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">schema</span><span class="p">(</span><span class="n">default</span><span class="p">,</span> <span class="n">partial</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">ValidationError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ValidationError</span><span class="p">(</span><span class="s2">&quot;Default values for class </span><span class="si">%r</span><span class="s2"> did not validate against &quot;</span>
+                                  <span class="s2">&quot;its own schema, error was:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">e</span><span class="p">))</span>
+    
+    <span class="k">return</span> <span class="n">fields</span><span class="p">,</span> <span class="n">schema</span>
+
+
+<span class="n">Schematic</span> <span class="o">=</span> <span class="kc">None</span> 
+
+<span class="k">class</span> <span class="nc">SchematicType</span><span class="p">(</span><span class="nb">type</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">namespace</span><span class="p">):</span>
+        <span class="n">schema</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">Schematic</span><span class="p">:</span>
+            <span class="n">full_name</span> <span class="o">=</span> <span class="n">namespace</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;__schema_name__&#39;</span><span class="p">,</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getmodule</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;.&#39;</span> <span class="o">+</span> <span class="n">name</span><span class="p">)</span>
+            <span class="n">fields</span><span class="p">,</span> <span class="n">schema</span> <span class="o">=</span> <span class="n">generate_schema_for_class</span><span class="p">(</span><span class="n">full_name</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span>
+            <span class="n">namespace</span><span class="p">[</span><span class="s1">&#39;__schema__&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">schema</span>
+            <span class="n">namespace</span><span class="p">[</span><span class="s1">&#39;__fields__&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fields</span>
+        <span class="n">typ</span> <span class="o">=</span> <span class="nb">type</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">bases</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">schema</span><span class="p">:</span>
+            <span class="n">schema</span><span class="o">.</span><span class="n">system</span><span class="o">.</span><span class="n">register_instancer</span><span class="p">(</span><span class="n">schema</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">typ</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">typ</span>
+
+<div class="viewcode-block" id="Schematic"><a class="viewcode-back" href="../../../index.html#splendor.schema.fields.Schematic">[docs]</a><span class="k">class</span> <span class="nc">Schematic</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">SchematicType</span><span class="p">):</span>   <span class="c1"># pylint: disable-msg=E0102</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Construct that carries a schema (`__schema__`) and enforces its properties</span>
+<span class="sd">    to follow it.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">__schema__</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">__fields__</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">__schematic_config__</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__schema__</span><span class="o">.</span><span class="n">value</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;default&#39;</span><span class="p">,</span> <span class="p">{}))</span>
+        <span class="k">if</span> <span class="n">__schematic_config__</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">__schematic_config__</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">validate</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> 
+        <span class="k">return</span> <span class="n">f</span><span class="s1">&#39;</span><span class="si">{self.__class__.__name__}</span><span class="s1">(</span><span class="si">{self.__dict__!r}</span><span class="s1">)&#39;</span>
+
+    <span class="k">def</span> <span class="nf">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="vm">__dict__</span>
+
+    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__schema__</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">is_valid</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">validate</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">get_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">__schema__</span>
+
+<div class="viewcode-block" id="Schematic.get_schema_value"><a class="viewcode-back" href="../../../index.html#splendor.schema.fields.Schematic.get_schema_value">[docs]</a>    <span class="k">def</span> <span class="nf">get_schema_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ignore_default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">ignore_empty</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">export</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Combines the schema-property values of this object with the inherited ones,</span>
+<span class="sd">        and returns it as a dict.</span>
+
+<span class="sd">        If `ignore_default` is `True` (default) properties with default values won&#39;t</span>
+<span class="sd">        be included.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">fields</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="n">__fields__</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;export&#39;</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">field</span><span class="o">.</span><span class="n">has_value</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+                <span class="n">v</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="ow">not</span> <span class="n">ignore_default</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">v</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+                    <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">v</span> <span class="ow">or</span> <span class="n">ignore_empty</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+                <span class="n">value</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+        <span class="k">return</span> <span class="n">value</span></div>
+
+    <span class="k">def</span> <span class="nf">set_schema_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__schema__</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">marshal_as</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">system</span><span class="p">,</span> <span class="n">export</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">system</span> <span class="ow">is</span> <span class="ow">not</span> <span class="s1">&#39;json&#39;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Marshalling is kinda fake right now, so we can only marshal to json&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">marshal_to_json</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_schema_value</span><span class="p">(</span><span class="n">export</span><span class="o">=</span><span class="n">export</span><span class="p">))</span>
+    
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">get_field</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">k</span><span class="p">):</span>
+        <span class="nb">getattr</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">marshal_to_json</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">export</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">Schematic</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">obj</span><span class="o">.</span><span class="n">marshal_as</span><span class="p">(</span><span class="s1">&#39;json&#39;</span><span class="p">,</span> <span class="n">export</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">Schema</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">marshal_to_json</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">config</span><span class="p">,</span> <span class="n">export</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">typing</span><span class="o">.</span><span class="n">Mapping</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">marshal_to_json</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">export</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">obj</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">obj</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">obj</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">obj</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">obj</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">obj</span>
+    <span class="k">elif</span> <span class="n">obj</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">typing</span><span class="o">.</span><span class="n">Iterable</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">marshal_to_json</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">export</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">]</span>
+    <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">transform_schema_value</span><span class="p">(</span><span class="n">schematic</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">ignore_default</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Schematic</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">value</span><span class="o">.</span><span class="n">get_schema_properties</span><span class="p">(</span><span class="n">ignore_default</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="n">transform_schema_value</span><span class="p">(</span><span class="n">schematic</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">ignore_default</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">v</span> <span class="ow">is</span> <span class="n">Undefined</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">schematic</span><span class="o">.</span><span class="n">__fields__</span><span class="p">:</span>
+                <span class="k">pass</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">Schematic</span><span class="p">):</span>
+                <span class="n">props</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">get_schema_properties</span><span class="p">()</span>
+            <span class="k">elif</span> <span class="n">v</span> <span class="ow">is</span> <span class="n">Undefined</span> <span class="ow">or</span> <span class="n">v</span> <span class="o">==</span> <span class="p">[]</span> <span class="ow">or</span> <span class="n">v</span> <span class="o">==</span> <span class="p">{}:</span>
+                <span class="k">del</span> <span class="n">props</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">values</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">Schematic</span><span class="p">):</span>
+            <span class="n">props</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span><span class="o">.</span><span class="n">get_schema_properties</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">v</span> <span class="ow">is</span> <span class="n">Undefined</span> <span class="ow">or</span> <span class="n">v</span> <span class="o">==</span> <span class="p">[]</span> <span class="ow">or</span> <span class="n">v</span> <span class="o">==</span> <span class="p">{}:</span>
+            <span class="k">del</span> <span class="n">props</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+
+
+
+<span class="k">class</span> <span class="nc">Configurable</span><span class="p">(</span><span class="n">Schematic</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A Schematic that can be reconfigured by calling it as a function with</span>
+<span class="sd">    new schema-properties.  This returns a new instance.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">(</span><span class="o">**</span><span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">__schema__</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="o">**</span><span class="n">value</span><span class="p">))</span>
+
+
+<span class="n">Boolean</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;bool&#39;</span><span class="p">)</span>
+<span class="n">Integer</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;int&#39;</span><span class="p">)</span>
+<span class="n">String</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;str&#39;</span><span class="p">)</span>
+<span class="n">Number</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;number&#39;</span><span class="p">)</span>
+<span class="n">Callable</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;callable&#39;</span><span class="p">)</span>
+<span class="n">Object</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;object&#39;</span><span class="p">)</span>
+<span class="n">Dict</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;dict&#39;</span><span class="p">)</span>
+<span class="n">List</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;list&#39;</span><span class="p">)</span>
+<span class="n">Set</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;set&#39;</span><span class="p">)</span>
+<span class="n">DateTime</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;datetime&#39;</span><span class="p">)</span>
+<span class="n">Date</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;date&#39;</span><span class="p">)</span>
+<span class="n">URIString</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s1">&#39;str&#39;</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;validate_uri&#39;</span><span class="p">)</span>
+<span class="n">Any</span> <span class="o">=</span> <span class="n">Field</span><span class="p">()</span>
+
+<span class="k">def</span> <span class="nf">AnyOf</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">Field</span><span class="p">(</span><span class="n">any_of</span><span class="o">=</span><span class="n">t</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">InstanceOf</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">Object</span><span class="p">(</span><span class="n">instance_of</span><span class="o">=</span><span class="n">t</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">AnyInstanceOf</span><span class="p">(</span><span class="n">types</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">Field</span><span class="p">(</span><span class="n">any_of</span><span class="o">=</span><span class="p">[</span><span class="n">InstanceOf</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">types</span><span class="p">],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">Enum</span><span class="p">(</span><span class="n">choices</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">String</span><span class="p">(</span><span class="n">enum</span><span class="o">=</span><span class="n">choices</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">Duck</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">Object</span><span class="p">(</span><span class="n">required</span><span class="o">=</span><span class="n">t</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">SchemaField</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">Field</span><span class="p">(</span><span class="n">schema_value</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">uuid4hex</span><span class="p">():</span>
+    <span class="k">return</span> <span class="n">uuid4</span><span class="p">()</span><span class="o">.</span><span class="n">hex</span>
+
+<span class="k">def</span> <span class="nf">UUID</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="n">kwargs</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;default&#39;</span><span class="p">,</span> <span class="n">uuid4hex</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">String</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">### Simple Fields ###</span>
+<span class="sd">Boolean = Field(bool)</span>
+<span class="sd">Integer = Field(int)</span>
+<span class="sd">String = Field(str)</span>
+<span class="sd">Float = Field(float)</span>
+<span class="sd">Complex = Field(complex)</span>
+
+<span class="sd">DictField = Field(dict)</span>
+
+
+<span class="sd">### Useful Fields ###</span>
+<span class="sd">Any = Field(lambda x: x)</span>
+<span class="sd">PositiveInteger = Field(int, ensure(lambda x: x &gt;= 0, &quot;Value must be greater or equal to zero: {value}&quot;))</span>
+
+
+<span class="sd">class Function(Field):</span>
+<span class="sd">    &quot;&quot; &quot;</span>
+<span class="sd">    A function field must not call its default when returning it.</span>
+<span class="sd">    &quot;&quot; &quot;</span>
+<span class="sd">    def config(self, kwargs):</span>
+<span class="sd">        super().config(kwargs)</span>
+<span class="sd">        self.factory = kwargs.get(&#39;factory&#39;, None)</span>
+
+<span class="sd">    def get_default(self):</span>
+<span class="sd">        if self.default is not Undefined:</span>
+<span class="sd">            return self.default</span>
+<span class="sd">        elif self.factory:</span>
+<span class="sd">            return self.factory()</span>
+<span class="sd">        else:</span>
+<span class="sd">            return Undefined</span>
+
+<span class="sd">def get_schema(dct):</span>
+<span class="sd">    if isinstance(dct, Schema):</span>
+<span class="sd">        return dct</span>
+<span class="sd">    elif isinstance(dct, dict):</span>
+<span class="sd">        return Schema(dct)</span>
+<span class="sd">    raise ValidationError(&quot;Must be a Schema instance or a dictionary that will be placed in a Schema().&quot;)</span>
+
+<span class="sd">SchemaField = Field(get_schema)</span>
+
+<span class="sd">def get_field(value):</span>
+<span class="sd">    if isinstance(value, Field):</span>
+<span class="sd">        return value</span>
+<span class="sd">    elif callable(value):</span>
+<span class="sd">        return Field(value)</span>
+<span class="sd">    raise ValidationError(&quot;Must be a Field instance or a callable that will be placed in a Field().&quot;)</span>
+
+<span class="sd">FieldField = Field(get_field)</span>
+
+<span class="sd">def InstanceOf(type, **args):</span>
+<span class="sd">    return Field(type_filter(type), **args)</span>
+
+<span class="sd">def Duck(method_names, **args):</span>
+<span class="sd">    def filter(obj):</span>
+<span class="sd">        for name in method_names:</span>
+<span class="sd">            if not callable(getattr(obj, name)):</span>
+<span class="sd">                raise ValidationError(&quot;Object must have the following methods: %s&quot; % name)</span>
+<span class="sd">        return obj</span>
+<span class="sd">    return Field(filter, **args)</span>
+
+<span class="sd">class QueryString(String):</span>
+<span class="sd">    found_in = &quot;query&quot;</span>
+
+<span class="sd">class PathString(String):</span>
+<span class="sd">    found_in = &quot;path&quot;</span>
+<span class="sd">&quot;&quot;&quot;</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">Splendor</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">APIs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../schema.html">Schema</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../collections.html">Collections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../versioning.html">Versioning</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../organic.html">Organic Development</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, ForgeWorks.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.8.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -3,6 +3,7 @@ import itertools
 import ipaddress
 import inflection
 import logging
+import collections
 from collections import OrderedDict
 from collections.abc import Mapping, MutableMapping, Sequence
 
@@ -372,11 +373,16 @@ class MinProperties(Constraint):
 @system.constraint(['object'])
 class Required(Constraint):
     description = "must have properties with the names: {value!r}"
-
+    
+    def compile(self, system):
+        if isinstance(self.value, str) or not isinstance(self.value, collections.Iterable):
+            raise TypeError(f"'{self.__class__.__name__.lower()}' constraint value must be an iterable other than a string.")
+        super().compile(system)
+    
     def __call__(self, instance, validate=False, partial=False):
         if partial:
             return instance
-
+        
         for key in self.value:
             if instance.get(key, Undefined) is Undefined:
                 self.fail()
@@ -391,8 +397,7 @@ class Properties(Constraint):
     def compile(self, system):
         result = {}
         for key, subval in self.value.items():
-            result[key] = system.schema(subval, name=key)
-            result[key].name = key
+            result[key] = system.schema(subval)
         self._property_schemas = result
 
     def get_pairs(self, instance):
@@ -611,7 +616,7 @@ class AnyOf(Constraint):
             for index, sub in enumerate(self._subschemas):
                 try:
                     return sub(instance, partial=partial)
-                except (TypeError, ValueError) as e:
+                except (TypeError, ValueError):
                     continue
             self.fail()
         return instance
@@ -659,7 +664,7 @@ date_re = re.compile(r'^\s*(\d\d\d\d)-(\d\d)-(\d\d)\s*$')
 time_re = re.compile(r'^\s*(\d\d):(\d\d):(\d\d)(\.(\d+))?([zZ]|(([-+])(\d\d):?(\d\d)))\s*$')
 date_time_re = re.compile(r'^\s*(\d\d\d\d)-(\d\d)-(\d\d)[ tT](\d\d):(\d\d):(\d\d)(\.(\d+))?([zZ]|(([-+])(\d\d):?(\d\d)))\s*$')
 email_re = re.compile(r'(?:[a-z0-9!#$%&\'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&\'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])')
-hostname_re = re.compile("(?!-)[A-Z\d-]{1,63}(?<!-)$", re.IGNORECASE)
+hostname_re = re.compile(r"(?!-)[A-Z\d-]{1,63}(?<!-)$", re.IGNORECASE)
 
 
 @system.constraint(['string'])
@@ -753,3 +758,5 @@ class Format(Constraint):
             return True
         return rfc3987.match(instance, rule='IRI_reference')
 
+### Quick Schemas ###
+system.Object = system.schema({'type': 'object'})

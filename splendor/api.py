@@ -1,23 +1,14 @@
+from collections.abc import Callable
+from urllib.parse import urlparse
 from pathlib import PurePosixPath
 
 from .schema import Schematic, Configurable, fields
-from .operation import Operation, Response, Parameter, RequestBody, Header, Link
+from .operation import Operation, Response, Parameter, RequestBody, Header, Link, build_parameters
 from . import common
 from .data import DataKey
-from .util import get_schema, build_parameters
-from flask import Blueprint
+from .util import get_schema
+from flask import Blueprint, jsonify, render_template, current_app, request
 
-
-def setup_operations(cls):
-    for name, attr in vars(cls).items():
-        if isinstance(attr, LazyOperation):
-            LazyOperation
-
-
-def operation(**kwargs):
-    def decorator(fn):
-        return LazyOperation(callable=fn, kwargs=kwargs)
-    return decorator
 
 class Contact(Schematic):
     name = fields.String(required=True, description="The identifying name of the contact person/organization.")
@@ -85,6 +76,15 @@ class PathItem(Schematic):
     servers = fields.InstanceOf(Server, repeated=True)
     parameters = fields.InstanceOf(Parameter, repeated=True)
 
+    def __init__(self, obj=None, **kwargs):
+        if isinstance(obj, Collection):
+            assert False, "Fix me"
+        elif isinstance(obj, Operation):
+            kwargs.setdefault(obj.method.lower(), obj.summary)
+        elif isinstance(obj, Callable):
+            kwargs.setdefault('get', Operation(obj))
+        super().__init__(**kwargs)
+
     def register(self, app, options, first_registration=False):
         for method, v in vars(self).items():
             if isinstance(v, Operation):
@@ -113,7 +113,8 @@ class Collection(Schematic):
     A collection is a Splendor specific construct that describes a group of operations that have a common schema.
     """
     title = fields.String(required=True)
-    schema = fields.SchemaField()
+    schema = fields.AnyOf([fields.SubclassOf(Schematic), fields.SchemaField()], default=None)
+    item_factory = fields.Callable(export=False, default=None)
     auditor = fields.Callable(default=None)
     storage = fields.Duck(["save", "load", "delete"])
     filters = fields.InstanceOf(fields.Field, map=True)
@@ -128,15 +129,24 @@ class Collection(Schematic):
     url_prefix = fields.InstanceOf(PurePosixPath, export=False)
 
     ### Meta ###
+    def set_schema_value(self, value):
+        if 'schema' in value:
+            schema = value['schema']
+            if hasattr(schema, '__schema__'):
+                value.setdefault('item_factory', lambda x: schema(**x))
+                value['schema'] = schema.__schema__
+        super().set_schema_value(value)
+
     def __repr__(self):
         return f'{self.__class__}({self.title})'
 
     def register_operation(self, app, options, fn, first_registration=False):
         path = PurePosixPath(options.get('url_prefix', ''))
+        options = dict(options, collection=self)
         if isinstance(fn, str):
             fn = getattr(self, fn)
         if isinstance(fn, common.OperationTemplate):
-            fn = fn.build(self, self.schema, name=self.name)
+            fn = fn.build(self, self.schema, factory=self.item_factory, name=self.name)
         if isinstance(fn, Operation):
             fn.operation_id = f'{self.name}:{fn.__name__}'
             fn.register(app, options, first_registration=first_registration)
@@ -144,7 +154,6 @@ class Collection(Schematic):
             fn = Operation(callable=fn, 
                            operation_id=f'{self.name}:{fn.__name__}',
                            method=options.get('methods', ['get'])[0].lower(),
-                           parameters=build_parameters(fn, path=str(path)),
                            description=fn.__doc__)
             fn.register(app, options, first_registration=first_registration)
         return fn
@@ -163,39 +172,45 @@ class Collection(Schematic):
             else:
                 self.register_operation(app, options, mapping_or_fn, first_registration=first_registration)
 
-
     @property
     def name(self):
         return self.title.lower()
 
     ### Interface ###
     def save(self, key, item, partial=False):
-        return self.storage.save(self.schema, key, item, partial)
+        if isinstance(item, Schematic):
+            item = item.get_schema_value()
+        item = self.schema(item)
+        key, item = self.storage.save(key, item, partial)
+        if self.item_factory and item is not None:
+            item = self.item_factory(item)
+        return key, item
 
     def load(self, key):
-        return self.storage.load(self.schema, key)
+        item = self.storage.load(key)
+        if self.item_factory and item is not None:
+            item = self.item_factory( item )
+        return item
 
     def delete(self, key):
-        return self.storage.delete(self.schema, key)
+        return self.storage.delete(key)
 
     def query(self, **filters):
-        return self.storage.query(self.schema, filters)
+        return ((k, self.item_factory(data)) for k, data in self.storage.query(filters) if data is not None)
 
     def audit(self, perm, **args):
         if self.auditor:
             self.auditor(self, perm, **args)
 
     def enrich(self, key, item):
-        if key.id is not None:
-            item['_url'] = f'{self.url_prefix}/{key.id}'
-        if '_key' in item:
-            item['_key'] = str(key)
         return item
 
     def enrich_results(self, results):
-        results = [self.enrich(item['_key'], item) for item in results]
+        results = [self.enrich(key, item) for key, item in results]
         return results
 
+    def get_item_key(self, item):
+        key = [self.schema.name]
 
     ### Operations ###
     @common.listing
@@ -206,12 +221,12 @@ class Collection(Schematic):
     @common.post
     def post_item(self, item):
         self.audit('post', item=item)
-        key, item = self.save(None, item)
+        key, item = self.save(DataKey(get_schema(self.schema).name, item.id), item)
         return self.enrich(key, item)
     
     @common.get
     def get_item(self, id):
-        key = DataKey(self.schema.name, id)
+        key = DataKey(get_schema(self.schema).name, id)
         self.audit('get:key', key=key)
         item = self.load(key)
         if item is None:
@@ -221,21 +236,21 @@ class Collection(Schematic):
     
     @common.put
     def put_item(self, id, item):
-        key = DataKey(self.schema.name, id)
+        key = DataKey(get_schema(self.schema).name, id)
         self.audit('put', key=key, item=item)
         key, item = self.save(key, item)
         return self.enrich(key, item)
     
     @common.patch
     def patch_item(self, id, item):
-        key = DataKey(self.schema.name, id)
+        key = DataKey(get_schema(self.schema).name, id)
         self.audit('patch', key=key, item=item)
         key, item = self.save(key, item, partial=True)
-        return self.enrich(key, self.schema(item))
+        return self.enrich(key, item)
     
     @common.delete
     def delete_item(self, id):
-        key = DataKey(self.schema.name, id)
+        key = DataKey(get_schema(self.schema).name, id)
         self.audit('delete', key=key)
         self.delete(key)
 
@@ -260,11 +275,13 @@ class Api(Schematic):
     openapi = fields.String(required=True, default='3.0.1', description='This string MUST be the semantic version number of the OpenAPI Specification version that the OpenAPI document uses. The openapi field SHOULD be used by tooling specifications and clients to interpret the OpenAPI document. This is not related to the API info.version string.')
     info = fields.InstanceOf(Info, required=True, description='Provides metadata about the API. The metadata MAY be used by tooling as required.')
     servers = fields.InstanceOf(Server, repeated=True, description='An array of Server Objects, which provide connectivity information to a target server. If the servers property is not provided, or is an empty array, the default value would be a Server Object with a url value of /.')
-    paths = fields.AnyInstanceOf([PathItem, Collection], map=True, description='The available paths and operations for the API.')
-    components = fields.InstanceOf(Components, description='An element to hold various schemas for the specification.', default=Components)
+    paths = fields.InstanceOf(PathItem, map=True, description='The available paths and operations for the API.')
+    components = fields.InstanceOf(Components, description='An element to hold various schemas for the specification.')
     security = fields.List(map=True, items={'type': 'str'}, description='A declaration of which security mechanisms can be used across the API. The list of values includes alternative security requirement objects that can be used. Only one of the security requirement objects need to be satisfied to authorize a request. Individual operations can override this definition.')
     tags = fields.InstanceOf(Tag, repeated=True, description='A list of tags used by the specification with additional metadata. The order of the tags can be used to reflect on their order by the parsing tools. Not all tags that are used by the Operation Object must be declared. The tags that are not declared MAY be organized randomly or based on the tools\' logic. Each tag name in the list MUST be unique.')
     external_docs = fields.InstanceOf(ExternalDoc, description="A list of external doc objects to reference.")
+    swagger_path = fields.String(export=False, default="swagger", description="The relative url path from our base that should respond with an embedded swagger app.  Set to None to disable this feature.")
+    spec_path = fields.String(export=False, default="openapi.json", description="The relative url path from our base that should respond with our open api json document.  Set to None to disable this feature.")
     _url_prefix = fields.InstanceOf(PurePosixPath, export=False, description="The prefix that this API lives at in the flask App.", default="/")
     _collections = fields.InstanceOf(Collection, map=True, export=False, description="All collections registered to the api.")
 
@@ -282,9 +299,39 @@ class Api(Schematic):
             if isinstance(resource, Collection):
                 self._collections[resource.name] = resource
 
+        if self.spec_path is not None:
+            app.add_url_rule(str(self._url_prefix / self.spec_path), view_func=self.spec_view, methods=["GET"])
+
+        if self.swagger_path is not None:
+            app.add_url_rule(str(self._url_prefix / self.swagger_path), view_func=self.swagger_view, methods=["GET"])
+
+
+        if first_registration:
+            import jinja2, os
+
+            self.jinja_loader = jinja2.ChoiceLoader([
+                app.jinja_loader,
+                jinja2.FileSystemLoader([os.path.join( os.path.dirname(__file__), 'templates' )])
+            ])
+
     @property
     def name(self):
         return f"{self.info.title}_{self.info.version}"
+    
+    def spec_view(self):
+        spec = self.marshal_as('json')
+        if 'SPLENDOR_ADD_SERVERS' not in current_app.config:
+            url = urlparse(request.base_url)
+            url = f'{url.scheme}://{url.netloc}{self._url_prefix}'
+            spec['servers'] = spec.get('servers', []) + [{'url': url, 'description': 'This Server'}]
+        else:
+            spec['servers'] = spec.get('servers', []) + current_app.config['SPLENDOR_ADD_SERVERS']
+        return jsonify(spec)
+
+    def swagger_view(self):
+        return render_template('swagger.html', spec_url=str(self._url_prefix / self.spec_path))
+
+
 
 
 # TODO: 
@@ -293,8 +340,8 @@ class Api(Schematic):
 # Extra posts
 # Security
 # Responses
-# Respond sensetive to Accept
+# Respond sensitive to Accept
 # Export
-
-
+# Figure out Changelogs
+# Figure out communication management
 

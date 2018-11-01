@@ -1,0 +1,176 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Organic Development &#8212; Splendor 0.0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Versioning" href="versioning.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="organic-development">
+<h1>Organic Development<a class="headerlink" href="#organic-development" title="Permalink to this headline">¶</a></h1>
+<p>The point of Organic Development is to be conscious of the natural cycles of development work.  This
+allows us to maximize time and effort to focus on what matters.  Some of this might be obvious for
+a certain class of programmers, but we believe it should go with saying.</p>
+<p>The guidelines are:</p>
+<ol class="arabic simple">
+<li>Account for the future, but don’t build for it.  Build now, only what you need now.</li>
+<li>Don’t optimize too early.</li>
+<li>Don’t abstract too early.</li>
+</ol>
+<p>4. Don’t test too early.
+4. Stay dynamic and spontaneous early.  This fosters innovation.
+5. Become static and predictable when you need to.  This fosters quality.
+6. Iterate between these two phases, dynamic and static.
+7. Test each phase.</p>
+<p><a href="#id1"><span class="problematic" id="id2">**</span></a>1. Account for the future, but don’t build for it.  Build now, only what you need now.</p>
+<p>Too often, as developers, we get excited about what could or will be.  We forget that we usually have
+a very specific task in front of us.  We must resist the temptation to build out new features that
+we fixate on, but aren’t actually necessary.  Sometimes this means not adding parameters to a
+function that aren’t actually used.  Sometimes this means asking our product owner if they really
+need a feature.  Either way, the point is to focus on the road ahead, and not the million paths that
+the future might have for us.</p>
+<p>That said, we should still be account for, be mindful of the future, and shouldn’t paint ourselves
+into corners.</p>
+<p><strong>2. Stay dynamic, spontaneous, and un-optimized early so that you are not bogged down in details and can be flexible.  This fosters innovation.</strong></p>
+<p>The dynamic phase is one of innovation, when we don’t know exactly where we are going or how to get
+there.  It is a time that requires quick iteration and change.  It must be fluid and energetic.</p>
+<p>The main idea here is that too much code testing, documentation, and schema enforcement early bogs
+one down.  When you aren’t even sure exactly what you’re building, it’s probably not a good idea to
+test every minor detail.  By all means, start writing tests, start writing documentation, but make
+sure it’s light because you will need to update it often.</p>
+<p>Likewise, we don’t want to lock our object schemas up too tightly.  This is where things like
+non-relational databases, document stores, memory caches, etc, really shine.  Keep data ephemeral,
+which is to say, able to be completely deleted without slowing you down.</p>
+<p>Dynamic languages like Python are particularly good in this phase, because it lets us focus on
+logic rather than schema.  And allows us to quickly iterate without compile times or getting hung
+up on semi-colons.</p>
+<p><strong>3. Become static, predictable, and optimized when you need to, usually when other people start using your service.  This fosters quality.</strong></p>
+<p>The static phase is one of quality, when you have something and need to make sure it is tested,
+documented, and communicated effectively.  It is a time that requires a lot of debugging and
+structure.  It must be organized and calming.</p>
+<p>Here we want to focus on documentation, testing, schema, etc.  As opposed to the dynamic phase,
+where we wish to innovate, here we want resist innovation.  It’s not new features we are after,
+but rather that our already developed ones are able to execute flawlessly.  And importantly that
+all parties, our fellow developers, project managers, users, etc, are well informed of how our
+system works, and that we can guarantee that it will work within our support period.</p>
+<p>This is a great time to enforce schema.  We now know basically how our objects should work, and what
+features they should have.  More traditional databases are great tools here, and critically, we
+must ensure backup and migration processes are in place.</p>
+<p>Statically-typed languages have long shined here better than languages like Python, however
+with the accuracy of modern linters and some good tools to describe and enforce schema, dynamic
+languages are now arguably just as good and have the benefit of being able to support a dynamic
+phase as well.</p>
+<p><strong>4. Iterate between a dynamic phase to innovate new features, and a static one to ensure those features are well executed.  Test each phase.</strong></p>
+<p>Within something like a sprint, ideally we go through one or many dynamic and innovative phases per
+feature.  But if we’re honest, that often fails.  Often we only have time for a dynamic phase,
+but we try and cram in a static phase as well.  This is partly because we fail to estimate for the
+static phase.  We imagine we can get a feature done in a certain time frame, but our static phase
+is woefully underappreciated.  This builds technical debt, in essence it’s time that must be spent
+in a static phase.</p>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">Splendor</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">APIs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema.html">Schema</a></li>
+<li class="toctree-l1"><a class="reference internal" href="collections.html">Collections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="versioning.html">Versioning</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Organic Development</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="versioning.html" title="previous chapter">Versioning</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, ForgeWorks.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.8.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/organic.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

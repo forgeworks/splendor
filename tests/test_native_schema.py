@@ -36,3 +36,37 @@ def test_instance_of():
 
     for obj in eys:
         assert isinstance(obj, A)
+
+
+def test_name():
+    a = schema({
+        'type': 'dict'
+    })
+
+    assert a.name == '6b6218295eb1a7b2db98a916f8e27af8'
+
+    b = schema({
+        'type': 'dict'
+    })
+
+    assert a.name == b.name
+
+    c = schema({
+        'type': 'dict'
+    }, name='dict')
+
+    assert c.name == 'dict'
+
+    c = schema({
+        'type': 'dict'
+    }, name='test.dict')
+
+    assert c.name == 'test.dict'
+
+
+def test_hash():
+    s = schema({
+        'type': 'dict'
+    })
+
+    assert s.get_hash() == '6b6218295eb1a7b2db98a916f8e27af8'

@@ -1,0 +1,277 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Splendor &#8212; Splendor 0.0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Installation" href="installation.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="splendor">
+<h1>Splendor<a class="headerlink" href="#splendor" title="Permalink to this headline">¶</a></h1>
+<p>Splendor is an OpenAPI compatible Python web API framework built on top of <a class="reference external" href="http://flask.pocoo.org/">Flask</a>.</p>
+<p>We focus on <a class="reference internal" href="collections.html#collections"><span class="std std-ref">Collections</span></a> as a primary construct, tying together data, permissions, and business
+logic in an elegant way that can be immediately imported into tools like Swagger.</p>
+<p>We emphasize <a class="reference internal" href="philosophy.html#organic-development"><span class="std std-ref">Organic Development</span></a> of APIs by scaffolding the process from quick <em>iteration</em> to
+solid, well tested, documented, and importantly, <em>maintainable</em> versions.</p>
+<div class="section" id="user-s-guide">
+<h2>User’s Guide<a class="headerlink" href="#user-s-guide" title="Permalink to this headline">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#a-minimal-api">A Minimal API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#live-docs">Live Docs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#a-new-version">A New Version</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">APIs</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api.html#open-api">Open API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#splendor-api-class">Splendor Api Class</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#flask-integration">Flask Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#live-docs">Live Docs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api.html#operations">Operations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="schema.html">Schema</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="schema.html#schema-at-a-high-level">Schema at a High Level</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema.html#json-schema">JSON Schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema.html#schematics">Schematics</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="collections.html">Collections</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="collections.html#data-storage">Data Storage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="collections.html#security-auditing">Security + Auditing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="collections.html#enrichment">Enrichment</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="versioning.html">Versioning</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="versioning.html#feature-branching">Feature Branching</a></li>
+<li class="toctree-l2"><a class="reference internal" href="versioning.html#version-iteration">Version Iteration</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="philosophy">
+<h2>Philosophy<a class="headerlink" href="#philosophy" title="Permalink to this headline">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="organic.html">Organic Development</a></li>
+</ul>
+</div>
+</div>
+</div>
+<div class="section" id="outline">
+<h1>Outline<a class="headerlink" href="#outline" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><dl class="first docutils">
+<dt>User’s Guide</dt>
+<dd><ul class="first last">
+<li>Installation</li>
+<li>Quick Start</li>
+<li>Design Goals</li>
+<li>API</li>
+<li>Schema</li>
+<li>Collections</li>
+<li>Versioning</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>Philosophy</dt>
+<dd><ul class="first last">
+<li>Organic Development</li>
+<li>Service Oriented Architecture</li>
+<li>Design Process</li>
+<li>Maintainability</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>Tutorial</dt>
+<dd><ul class="first last">
+<li><dl class="first docutils">
+<dt>Before You Code</dt>
+<dd><ul class="first last">
+<li>Problem Statement</li>
+<li>Research</li>
+<li>Brainstorming</li>
+<li>Scoping</li>
+<li>Reframing</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>Iteration One</dt>
+<dd><ul class="first last">
+<li>Build</li>
+<li>Test</li>
+<li>Communicate</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>Iteration Two</dt>
+<dd><ul class="first last">
+<li>Build</li>
+<li>Test</li>
+<li>Communicate</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="first docutils">
+<dt>Iteration Three</dt>
+<dd><ul class="first last">
+<li>Research</li>
+<li>Build</li>
+<li>Test</li>
+<li>Communicate</li>
+</ul>
+</dd>
+</dl>
+</li>
+<li>Retrospective</li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+<div class="section" id="module-splendor.schema.fields">
+<span id="reference"></span><h2>Reference<a class="headerlink" href="#module-splendor.schema.fields" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="splendor.schema.fields.Schematic">
+<em class="property">class </em><code class="descclassname">splendor.schema.fields.</code><code class="descname">Schematic</code><span class="sig-paren">(</span><em>__schematic_config__=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/splendor/schema/fields.html#Schematic"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#splendor.schema.fields.Schematic" title="Permalink to this definition">¶</a></dt>
+<dd><p>Construct that carries a schema (<cite>__schema__</cite>) and enforces its properties
+to follow it.</p>
+<dl class="method">
+<dt id="splendor.schema.fields.Schematic.get_schema_value">
+<code class="descname">get_schema_value</code><span class="sig-paren">(</span><em>ignore_default=False</em>, <em>ignore_empty=True</em>, <em>export=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/splendor/schema/fields.html#Schematic.get_schema_value"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#splendor.schema.fields.Schematic.get_schema_value" title="Permalink to this definition">¶</a></dt>
+<dd><p>Combines the schema-property values of this object with the inherited ones,
+and returns it as a dict.</p>
+<p>If <cite>ignore_default</cite> is <cite>True</cite> (default) properties with default values won’t
+be included.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></li>
+<li><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></li>
+<li><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></li>
+</ul>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="#">Splendor</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">APIs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema.html">Schema</a></li>
+<li class="toctree-l1"><a class="reference internal" href="collections.html">Collections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="versioning.html">Versioning</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="organic.html">Organic Development</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+      <li>Next: <a href="installation.html" title="next chapter">Installation</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, ForgeWorks.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.8.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

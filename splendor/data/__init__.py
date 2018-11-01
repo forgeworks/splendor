@@ -2,6 +2,7 @@ from ..schema import Configurable, Schematic
 from ..schema import fields
 from uuid import uuid4
 from collections import defaultdict
+from ..util import get_schema
 
 
 def get_object_data(schema, item):
@@ -65,74 +66,29 @@ class DataStore(Configurable):
 class MemoryStore(DataStore):
     data = fields.Field(default=lambda: defaultdict(dict))
 
-    def delete(self, schema, key):
-        table = self.data[schema]
-        table.pop(str(key), None)
+    def delete(self, key):
+        self.data.pop(str(DataKey(key)), None)
 
-    def save(self, schema, key, item, partial=False):
-        if key is None:
-            key = self.get_item_default_key(schema, item)
+    def save(self, key, item, partial=False):
+        key = DataKey(key)
+
+        if partial and str(key) in self.data:
+            existing = self.data[str(key)]
+            existing.update(item)
+            return key, existing
         else:
-            key = DataKey(key)
-
-        table = self.data[schema]
-
-        if isinstance(item, Schematic):
-            item = vars(item)
-
-        if partial:
-            data = table.get(str(key), None)
-            if data is None:
-                table[str(key)] = get_object_data(schema, item)
-            else:
-                item = table[str(key)] = dict(data, **get_object_data(schema, item))
-        else:
-            table[str(key)] = get_object_data(schema, item)
-
-        self.set_item_key(schema, item, key)
+            self.data[str(key)] = item
+        
         return key, item
 
-    def load(self, schema, key):
+    def load(self, key):
         key = DataKey(key)
-        table = self.data[schema]
-        data = table.get(str(key), None)
-        if data is None:
-            return None
-        item = schema(data)
-        self.set_item_key(schema, item, key)
+        item = self.data.get(str(key), None)
         return item
 
-    def query(self, schema, filters):
-        for id, value in self.data[schema].items():
-            item = schema(value)
-            item['_key'] = DataKey(id)
-            yield item
-
-    def set_item_key(self, schema, item, key):
-        if hasattr(schema, '__schema__'):
-            schema = schema.__schema__
-
-        key = DataKey(key)
-
-        for k, prop in schema.get_constraint_value('properties', {}).items():
-            if prop.value.get('primary_key', False):
-                if isinstance(item, dict):
-                    item[k] = key.id
-                else:
-                    setattr(item, k, key.id)
-                return
-
-        raise RuntimeError("Unnable to set key on item, schema has no property with 'primary_key'.")
-
-    def get_item_default_key(self, schema, item):
-        if hasattr(schema, '__schema__'):
-            schema = schema.__schema__
-
-        for k, prop in schema.get_constraint_value('properties', {}).items():
-            if prop.value.get('primary_key', False):
-                return DataKey(getattr(item, k))
-
-        raise RuntimeError("Unnable to get default key for item, schema has no property with 'primary_key'.")
+    def query(self, filters):
+        for key, value in self.data.items():
+            yield DataKey(key), value
 
 
 class No():    

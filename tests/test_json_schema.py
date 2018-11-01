@@ -1,5 +1,5 @@
 import pytest
-from splendor.schema.json_object import *
+from splendor.schema.json import *
 
 EMPTY = schema({})
 

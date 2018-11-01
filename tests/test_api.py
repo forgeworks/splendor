@@ -61,34 +61,40 @@ def api():
         }
         paths = {
             '/houses': houses,
-            '/hello/<who>': say_hello,
+            #'/hello/<who>': say_hello,
         }
 
     return TestApi()
 
 
-def test_api_basics(app, client, api):
-    app.register_blueprint(api)
-
-    # Test collection
-    house = House(name="Cottage 1")
-
-    r = client.put('/houses/1', json=vars(house))
-    assert r.status_code == 200
-
-    r = client.get('/houses/1')
-    assert r.status_code == 200
-    assert r.json['_url'] == '/houses/1'
-    assert r.json['name'] == house.name
-
-    client.delete('/houses/1')
-
-    assert client.get('/houses/1').status_code == 404
-
-
-def test_extra_view(app, client, api):
-    app.register_blueprint(api)
-
-    r = client.put('/hello/world')
-    assert r.status_code == 200
-    assert r.data.decode('utf-8') == 'Hello world'
+#def test_api_info(api):
+#    #print(api._url_prefix)
+#    #assert api.pack() == None
+#    pass
+#
+#
+#def test_api_basics(app, client, api):
+#    app.register_blueprint(api)
+#
+#    # Test collection
+#    house = House(name="Cottage 1")
+#
+#    r = client.put('/houses/1', json=vars(house))
+#    assert r.status_code == 200
+#
+#    r = client.get('/houses/1')
+#    assert r.status_code == 200
+#    assert r.json['_url'] == '/houses/1'
+#    assert r.json['name'] == house.name
+#
+#    client.delete('/houses/1')
+#
+#    assert client.get('/houses/1').status_code == 404
+#
+#
+#def test_extra_view(app, client, api):
+#    app.register_blueprint(api)
+#
+#    r = client.put('/hello/world')
+#    assert r.status_code == 200
+#    assert r.data.decode('utf-8') == 'Hello world'

@@ -1,5 +1,36 @@
 import inflection
 import json
+import networkx as nx
+import functools
+import hashlib
+import typing
+import inspect
+
+
+### Hash function
+def build_hash(obj, hsh):
+    if isinstance(obj, Schema):
+        hsh.update( obj.get_hash().encode() )
+    elif isinstance(obj, str):
+        hsh.update( obj.encode() )
+    elif isinstance(obj, bytes):
+        hsh.update( obj )
+    elif isinstance(obj, typing.Mapping):
+        for k, item in obj.items():
+            build_hash(k, hsh)
+            build_hash(item, hsh)
+    elif isinstance(obj, typing.Iterable):
+        for item in obj:
+            build_hash(item, hsh)  
+    elif hasattr(obj, '__schema__'):
+        hsh.update( obj.__schema__.get_hash().encode() )
+    else:
+        hsh.update(str(hash(obj)).encode())
+
+
+### Identity function
+def identity(x):
+    return x
 
 
 class Undefined:
@@ -21,33 +52,36 @@ class SchemaFailure(ValidationError):
         self.schema = schema
         self.context = dict(schema.__dict__, schema=schema)
         self.constraints = constraints or {}
-        if context:
-            self.context.update(context)
+        self.message = message
+        self.sub_errors = {}
 
     def __str__(self):
         return self.format()
 
     def format(self, prefix="  ", depth=0):
         parts = [(prefix * depth) + self.message.format(self.context)]
-        for name, error in (sub_errors or {}).items():
+        for name, error in (self.sub_errors or {}).items():
             parts.append(error.format(prefix, depth+1))
         return "\n".join(parts)
 
 
 class ConstraintFailure(ValidationError):
-    def __init__(self, constraint, sub_errors=None, path=[], message=None):
+    def __init__(self, constraint, sub_errors=None, path=[], message=None, schema=None):
         self.constraint = constraint
         self.sub_errors = sub_errors
         self.message = message
         self.path = path or []
+        self.schema = schema
 
     def __str__(self):
         err = self.constraint.describe(self.message)
+        parts = [err]
         if self.path:
             path = "/".join(self.path)
-            return f'{path} -- {err}'
-        else:
-            return err
+            parts.insert(0, path)
+        if self.schema and self.schema._name:
+            parts.insert(0, self.schema._name)
+        return " -- ".join(parts)
 
 
 class SchemaValidationResult:
@@ -177,6 +211,8 @@ class System:
     def __init__(self, **attrs):
         self.name = None
         self.primitives = {}
+        self.network = nx.Graph()
+        
         self.schema_transformations = {}
         self.constraint_transformations = {}
         self.constraint_analogs = {}
@@ -185,7 +221,7 @@ class System:
         self.name_inflection = inflection.underscore
         self.empty_values = [Undefined]
         self.reserved_constraints = ['system']
-        self.schema_factory = getattr(self, 'schema_factory', None)
+        self.schema_factory = getattr(self, 'schema_factory', Schema)
         self.schema_instancers = {}
         self.ignore_all_formats = False
         self.ignore_these_formats = []
@@ -211,6 +247,7 @@ class System:
                 "Constraints cannot be any of: {!r}".format(self.reserved_constraints))
         self.constraint_primitives[name] = primitives
         self.constraints[name] = constraint
+        self.network.add_node((self.name, 'constraint', name), cls=constraint)
         return constraint
 
     def constraint(self, primitives, name=None):
@@ -219,14 +256,14 @@ class System:
             return fn
         return decorator
 
-    def get_constraint_cls(self, name, default=Undefined):
+    def get_constraint(self, name, default=Undefined):
         name = self.name_inflection(name.lstrip('_'))
         if name not in self.constraints:
             if default is Undefined:
                 raise TypeError(f"unknown constraint named: {name}")
             else:
-                return default
-        return self.constraints[name]
+                return None, default
+        return name, self.constraints[name]
 
     def get_constraint_primitives(self, name):
         name = self.name_inflection(name.lstrip('_'))
@@ -251,11 +288,127 @@ class System:
                 return True
         return False
 
-    def borrow_constraint(self, other_system, name, new_name=None, primitives=None):
-        c = other_system.constraints[other_system.name_inflection(name)]
-        new_name = self.name_inflection(new_name or name)
-        self.register_constraint(c, name=new_name, primitives=primitives)
-        self.constraint_analogs[(other_system, name)] = new_name
+    def borrow_constraint(self, other_system, their_name, our_name=None, primitives=None, transform_to_theirs=identity, transform_to_ours=identity):
+        our_name = self.name_inflection(our_name or their_name)
+        their_name, constraint = other_system.get_constraint(their_name)
+        
+        self.register_constraint(constraint, name=our_name, primitives=primitives)
+
+        self.add_constraint_transformation(our_name, their_name, 
+                                           from_system=self, to_system=other_system, 
+                                           fn=transform_to_theirs)
+        self.add_constraint_transformation(their_name, our_name, 
+                                           from_system=other_system, to_system=self, 
+                                           fn=transform_to_ours)
+
+    def add_constraint_transformation(self, from_name, to_name, fn=identity, from_system=None, to_system=None):
+        from_system = from_system or self
+        to_system = to_system or self
+
+        from_name, from_constraint = from_system.get_constraint(from_name)
+        to_name, to_constraint = to_system.get_constraint(to_name)
+
+        from_node = (from_system.name, 'constraint', from_name)
+        to_node = (to_system.name, 'constraint', to_name)
+        
+        if not self.network.has_node(from_node):
+            self.network.add_node(from_node, name=from_name, cls=from_constraint)
+
+        if not self.network.has_node(to_node):
+            self.network.add_node(to_node, name=to_name, cls=to_constraint)
+
+        self.network.add_edge(from_node, to_node, fn=fn)
+
+    def add_schema_transformation(self, source_schema, destination_name, fn=identity):
+        pass
+        from_node = self.get_node(from_system, 'schema', from_name)
+        to_node = self.get_node(to_system, 'schema', to_name)
+
+        if not self.network.has_node(from_node):
+            self.network.add_node(from_node, name=from_name, cls=from_constraint)
+
+        if not self.network.has_node(to_node):
+            self.network.add_node(to_node, name=to_name, cls=to_constraint)
+
+
+    def transform_instance_via_constraint(self, instance, from_name, to_name, from_system=None, to_system=None):
+        """
+        Transforms data `instance` from satisfying constraint `from_name` to satisfying constraint `to_name`.
+        By default, we mean with the system, but by specifying `from_system` or `to_system` one can
+        transform into others.
+
+        This is usually done to tranform from one system to another.  For instance, native max_length
+        to json maxLength.  In that case, the transformer is `identity()`, but this might not always be
+        the case.
+        """
+        from_node = self.get_node(from_system, 'constraint', from_name)
+        to_node = self.get_node(to_system, 'constraint', to_name)
+        
+        path = nx.shortest_path(from_node, to_node)
+        source = path.pop(0)
+        while path:
+            dest = path.pop(0)
+            instance = self.network[source][dest]['fn'](data)
+            source = dest
+        
+        return instance
+
+    def transform_instance_to_system(self, instance, schema, to_system, to_schema_name=None):
+        from_schema_name = schema.name
+        to_schema_name = to_schema_name or schema.name
+
+        #find A'
+        from_node = self.get_node(from_system, 'primitive', from_name)
+        to_node = self.get_node(to_system, 'primitive', to_name)
+
+        if not self.network.has_node(to_node):
+            self.derive_analog_schema(schema, to_system)
+
+    
+    def derive_analog_schema(self, schema, other_system):
+        """
+        Creates an analog schema that exists within the other_system and a transformation
+        to get there.  Adds it to the system's network.
+        """
+        for name, value in schema.constraints.items():
+            #First see if there is a
+            pass
+
+    def get_node(self, system, type, name):
+        system = system or self
+        return (sysem.name, type, system.name_inflection(name))
+
+    def transform_instance_via_primitive(self, instance, from_name, to_name, from_system=None, to_system=None):
+        from_node = self.get_node(from_system, 'primitive', from_name)
+        to_node = self.get_node(to_system, 'primitive', to_name)
+        
+        path = nx.shortest_path(self.network, from_node, to_node)
+        instance = self.transform_via_path(instance, path)
+        
+        return instance
+
+    def transform_schema_to_other_system(self, schema, other_system):
+        pass
+    
+    def transform_instance_to_other_system(self, schema, instance, from_system=None, to_system=None, to_schema_name=None):
+        from_node = self.get_node(from_system, 'schema', schema.name)
+        to_node = self.get_node(to_system, 'schema', other_schema_name or schema.name)
+
+        if self.network.has(to_node):
+            path = nx.shortest_path(self.network, from_node, to_node)
+            if path:
+                instance = self.transform_via_path(instance, path)
+                return instance
+
+        return instance
+
+    def transform_via_path(self, instance, path):
+        source = path.pop(0)
+        while path:
+            dest = path.pop(0)
+            instance = self.network[source][dest]['fn'](data)
+            source = dest
+        return instance
 
     def register_instancer(self, schema, fn):
         if not isinstance(schema, str):
@@ -295,23 +448,30 @@ class System:
         transformation = self.constraint_transformations.get(sig, None)
         if transformation:
             return transformation(self, c, other_system)
-        return constraint.transform(self, other_system)
+        return c.transform(self, other_system)
 
 
 class Schema:
     def __init__(self, value={}, system=None, name=None):
+        self._name = name
         self.system = system
         self.value = value
-        self.name = name
         self.constraints = {}
         self.examples = {}
         if system:
             self.compile(system)
     
     def __repr__(self):
-        if self.name:
-            return f"{self.__class__.__name__}(name={self.name!r}, value={self.value!r})"
+        if self._name:
+            return f"{self.__class__.__name__}(name={self._name!r}, value={self.value!r})"
         return f"{self.__class__.__name__}({self.value!r})"
+
+    def get_hash(self):
+        if not hasattr(self, '_hash'):
+            hsh = hashlib.new('md5', self.system.name.encode())
+            build_hash(self.value, hsh)
+            self._hash = hsh.hexdigest()
+        return self._hash
 
     def __call__(self, instance, partial=False):
         assert self.system, "Schema needs a system before it is used."
@@ -321,11 +481,12 @@ class Schema:
         if type_constraint is not None:
             try:
                 instance = type_constraint(instance, validate=False, partial=partial)
-            except ValueError as e:
-                raise ConstraintFailure(type_constraint, None, ['type'], str(e))
-            except ValidationError as e:
+            except ConstraintFailure as e:
+                e.schema = self
                 e.path.insert(0, 'type')
                 raise
+            except ValueError as e:
+                raise ConstraintFailure(type_constraint, None, ['type'], str(e))
 
         for name, c in self.constraints.items():
             if c is type_constraint:
@@ -335,6 +496,7 @@ class Schema:
             try:
                 instance = c(instance, validate=False, partial=partial)
             except ConstraintFailure as e:
+                e.schema = self
                 e.path.insert(0, name)
                 raise
 
@@ -398,14 +560,16 @@ class Schema:
         else:
             return default
 
+    def marshal(self, ohter_system):
+        pass
+
     def transform(self, system, other):
         return other.schema(self.value)
 
     def _set_constraint(self, name, value):
         if value is Undefined:
-            return self._del_constraint(self, name)
-        name = self.system.name_inflection(name)
-        cls = self.system.get_constraint_cls(name, None)
+            return self._del_constraint(name)
+        name, cls = self.system.get_constraint(name, None)
         if cls is None:
             return None
         self.constraints[name] = cls(self, value)
@@ -422,6 +586,15 @@ class Schema:
         if props is None:
             return ()
         return props.items()
-    
+
+    @property
+    def name(self):
+        if not self._name:
+            return self.get_hash()
+        return self._name
+
+    @property
+    def full_name(self):
+        return f'{self.schema.name}:{self.name}'
 
 System.schema_factory = Schema

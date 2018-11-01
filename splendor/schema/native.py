@@ -42,7 +42,7 @@ primitives = system.primitives
 constraints = system.constraints
 schema = system.schema
 
-from .json_object import system as json
+from .json import system as json
 
 
 #system.map_transformations({
@@ -123,8 +123,22 @@ class InstanceOf(Constraint):
             return instance
         elif isinstance(instance, dict):
             return self.value(**instance)
-        else:
-            self.fail()
+        elif not validate:
+            try:
+                return self.value(instance)
+            except:
+                raise
+        self.fail()
+
+
+@system.constraint(['callable'])
+class SubclassOf(Constraint):
+    description = "must be a subclass of: {value!r}"
+
+    def __call__(self, instance, validate=False, partial=False):
+        if isinstance(instance, type) and issubclass(instance, self.value):
+            return instance
+        self.fail()
 
 
 @system.constraint(['object', 'dict'])

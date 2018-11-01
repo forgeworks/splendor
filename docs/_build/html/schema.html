@@ -1,0 +1,238 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Schema &#8212; Splendor 0.0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Collections" href="collections.html" />
+    <link rel="prev" title="APIs" href="api.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="schema">
+<h1>Schema<a class="headerlink" href="#schema" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="schema-at-a-high-level">
+<h2>Schema at a High Level<a class="headerlink" href="#schema-at-a-high-level" title="Permalink to this headline">¶</a></h2>
+<p>Let’s first define what we mean by <em>schema</em>:</p>
+<blockquote>
+<div>A <em>schema</em> is a collection of <em>constraints</em> that define the range of values a piece of data
+can have.</div></blockquote>
+<p>One way to think of a schema is as a hat box.  You can put a lot of hats in any given hat box,
+different colors, designs, materials, but the hat box gives it specific dimensions that it must
+adhere to.</p>
+<p>In the same way, you can think of a database row schema as a hat box, or a variable in a strongly
+typed language as a hat box.  In fact a “type” is another way of saying a schema, or more
+specifically it is a constraint within a schema.</p>
+<p>Each constraint can be something simple, like “must be a string”, or “must not be over 12 characters.”
+Some can be complex, like it must adhere to a specific regular expression, or it must match the
+RFC 3987 date format.</p>
+<p>Schema can be implicit, like when your functions just assumes the object they receive has a certain
+attribute.  Or they can be explicit, like in a Django models.py, or in a JSON Schema definition file.</p>
+<p>One of the goals for Splendor is to foster a transition from implicit schema early on when you are
+problem solving to explicit schema later when you need to ensure quality and communication.</p>
+</div>
+<div class="section" id="json-schema">
+<h2>JSON Schema<a class="headerlink" href="#json-schema" title="Permalink to this headline">¶</a></h2>
+<p>The Open API specification makes heavy use of <a class="reference external" href="https://json-schema.org/specification.html">JSON Schema</a>.  This means Splendor must be able to
+output all schema as JSON Schema definitions.</p>
+<p>Gratefully, the <a class="reference external" href="https://json-schema.org/specification.html">JSON Schema</a> specification is well done, portable, and defines most of the
+features you’ll ever need, and is extensible for the rest.</p>
+<p>Splendor has an inner module <code class="docutils literal notranslate"><span class="pre">splendor.schema</span></code> which defines <code class="docutils literal notranslate"><span class="pre">Schema</span></code> and <code class="docutils literal notranslate"><span class="pre">Constraint</span></code>
+classes.  These can readily be transformed into JSON Schema objects.</p>
+<p>JSON Schema can be created like so:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">splendor.schema.json</span> <span class="k">import</span> <span class="n">Schema</span>
+
+<span class="n">Coordinates</span> <span class="o">=</span> <span class="n">Schema</span><span class="p">({</span>
+    <span class="s2">&quot;required&quot;</span><span class="p">:</span> <span class="p">[</span> <span class="s2">&quot;latitude&quot;</span><span class="p">,</span> <span class="s2">&quot;longitude&quot;</span> <span class="p">],</span>
+    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;object&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;properties&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;latitude&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;number&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;minimum&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">90</span><span class="p">,</span>
+            <span class="s2">&quot;maximum&quot;</span><span class="p">:</span> <span class="mi">90</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;longitude&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;number&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;minimum&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">180</span><span class="p">,</span>
+            <span class="s2">&quot;maximum&quot;</span><span class="p">:</span> <span class="mi">180</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">})</span>
+</pre></div>
+</div>
+<p>We can use it to validate pieces of data:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span> <span class="n">Coordinates</span><span class="o">.</span><span class="n">validate</span><span class="p">({</span><span class="s2">&quot;latitude&quot;</span><span class="p">:</span> <span class="s2">&quot;48.858093&quot;</span><span class="p">,</span>
+<span class="gp">... </span>                            <span class="s2">&quot;longitude&quot;</span><span class="p">:</span> <span class="s2">&quot;2.294694&quot;</span><span class="p">})</span> <span class="p">)</span>
+<span class="go">True</span>
+
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span> <span class="n">Coordinates</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="s2">&quot;bad data&quot;</span><span class="p">)</span> <span class="p">)</span>
+<span class="go">False</span>
+</pre></div>
+</div>
+<p>For our purposes, however, validation is only one part of it.  Most of the time, we don’t care
+if the data validates to a schema, rather we want it to match the schema.</p>
+<p>The object returned is a Schema instance, and can be used as a function to coerce its input into
+well structured data. Here we give the properties strings, but they are coerced into Python floats:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">coords</span> <span class="o">=</span> <span class="n">Coordinates</span><span class="p">({</span><span class="s2">&quot;latitude&quot;</span><span class="p">:</span> <span class="s2">&quot;48.858093&quot;</span><span class="p">,</span>
+<span class="gp">... </span>                      <span class="s2">&quot;longitude&quot;</span><span class="p">:</span> <span class="s2">&quot;2.294694&quot;</span><span class="p">})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coords</span><span class="o">.</span><span class="n">latitude</span>
+<span class="go">48.858093</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coords</span><span class="o">.</span><span class="n">longitude</span>
+<span class="go">2.294694</span>
+</pre></div>
+</div>
+<p>A Schema instance will do its best to coerce a value, or otherwise raise a ValidationError.</p>
+<p>Any value coerced into the json schema system can be readily serialized into a proper JSON string:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">json</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span> <span class="n">Coordinates</span><span class="p">({</span><span class="s2">&quot;latitude&quot;</span><span class="p">:</span> <span class="s2">&quot;48.858093&quot;</span><span class="p">,</span>
+<span class="gp">... </span>                         <span class="s2">&quot;longitude&quot;</span><span class="p">:</span> <span class="s2">&quot;2.294694&quot;</span><span class="p">})</span> <span class="p">)</span>
+<span class="go">&#39;{&quot;latitude&quot;: 48.858093, &quot;longitude&quot;: 2.294694}&#39;</span>
+</pre></div>
+</div>
+<p>A Schema is made up of various named <code class="docutils literal notranslate"><span class="pre">Constraint</span></code> values.  The names are registered to the
+<code class="docutils literal notranslate"><span class="pre">System</span></code> we are working in.  JSON Schema defines a plethora of constraints such as ‘required’,
+‘type’, ‘properties’, etc.  Splendor currently defines two systems, <code class="docutils literal notranslate"><span class="pre">splendor.schema.json</span></code> and
+<code class="docutils literal notranslate"><span class="pre">splendor.schema.native</span></code>.  The native system borrows most of the constraints but has room for
+other primitive types like ‘set’, ‘decimal’, ‘bytes’, etc.</p>
+<p>Custom constraints can be added easily, see <code class="docutils literal notranslate"><span class="pre">splendor.schema.json</span></code> for examples.</p>
+</div>
+<div class="section" id="schematics">
+<h2>Schematics<a class="headerlink" href="#schematics" title="Permalink to this headline">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">splendor.schema.fields</span></code> is a module that helps us build schema quickly using a familiar
+class-based approach:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">splendor.schema</span> <span class="k">import</span> <span class="n">fields</span>
+
+<span class="k">class</span> <span class="nc">Pet</span><span class="p">(</span><span class="n">fields</span><span class="o">.</span><span class="n">Schematic</span><span class="p">):</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">String</span><span class="p">(</span><span class="n">min_length</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">50</span><span class="p">)</span>
+    <span class="n">status</span> <span class="o">=</span> <span class="n">fields</span><span class="o">.</span><span class="n">Enum</span><span class="p">([</span><span class="s1">&#39;available&#39;</span><span class="p">,</span> <span class="s1">&#39;pending&#39;</span><span class="p">,</span> <span class="s1">&#39;sold&#39;</span><span class="p">],</span>
+                         <span class="n">default</span><span class="o">=</span><span class="s1">&#39;available&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>One can then use the object as one would expect:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">mittens</span> <span class="o">=</span> <span class="n">Pet</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;Mr. Mittens&quot;</span><span class="p">,</span> <span class="n">status</span><span class="o">=</span><span class="s2">&quot;pending&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mittens</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s1">&#39;sold&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">mittens</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">&quot;is now&quot;</span><span class="p">,</span> <span class="n">mittens</span><span class="o">.</span><span class="n">status</span><span class="p">)</span>
+<span class="go">Mr. Mittens is now sold</span>
+</pre></div>
+</div>
+<p>Trying to assign an incorrect value will raise an error:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mittens</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s1">&#39;not a status&#39;</span>  <span class="c1"># raises ConstraintFailure</span>
+</pre></div>
+</div>
+<p>We can also marshal it to a JSONable object:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">json</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">mittens</span><span class="o">.</span><span class="n">marshal_as</span><span class="p">(</span><span class="s1">&#39;json&#39;</span><span class="p">))</span>
+<span class="go">{&quot;name&quot;: &quot;Mr. Mittens&quot;, &quot;status&quot;: &quot;sold&quot;}</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">Pet</span></code> class has a <code class="docutils literal notranslate"><span class="pre">__schema__</span></code> object, that defines the actual schema:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">Pet</span><span class="o">.</span><span class="n">__schema__</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">Splendor</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">APIs</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Schema</a></li>
+<li class="toctree-l1"><a class="reference internal" href="collections.html">Collections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="versioning.html">Versioning</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="organic.html">Organic Development</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="api.html" title="previous chapter">APIs</a></li>
+      <li>Next: <a href="collections.html" title="next chapter">Collections</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, ForgeWorks.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.8.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/schema.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

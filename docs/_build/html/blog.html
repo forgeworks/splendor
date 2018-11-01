@@ -1,0 +1,149 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Selecting A Version &#8212; Splendor 0.0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="selecting-a-version">
+<h1>Selecting A Version<a class="headerlink" href="#selecting-a-version" title="Permalink to this headline">¶</a></h1>
+<p>There are three popular ideas for how users should select a version through their requests.  Here
+they are ordered in the least RESTful to the most:</p>
+<p><strong>URL Selector</strong>:
+Usually by creating different path prefixes <cite>/v1</cite>, <cite>/v2</cite>, etc, we have the user adjust their URLs
+in order to select what version they need.  This is really simple, popular strategy, and basically
+ensures the user must be cognizant of what version of the API they request.  Unfortunately it
+breaks a RESTful ideal that resources should only be at one location, since a resource like a <em>Pet</em>
+at <cite>/v1/pets/42</cite> might be exactly the same as <cite>/v2/pets/42</cite> we actually have two URLs for that pet.
+This can cause issues with proxies and other systems that expect URLs to be singular.</p>
+<p>This strategy also means users must pin to a specific version.  If version 3 comes out, legacy users
+won’t be suddenly using it instead of version 2.</p>
+<p><strong>Header Selector</strong>:
+By using a header like <cite>X-Content-Version</cite>&nbsp;we allow the user to <em>optionally</em> select what version
+they want.  This makes it a little harder with some tools, like curl, because you’ll have to set
+a header for your request as well.  In fact generally the version is less visible than, say the
+URL Selector, when you are debugging.  However, it means all the URLs are the same.</p>
+<p>It also raises a small issue with what happens when the client doesn’t set the header?  Do you give
+them the latest version?  If so, when a new version comes out, you might find that legacy users,
+having never had to specify their version are all getting the new version accidentally.  Another
+option is to raise a 400 BadRequest suggesting the user set the header.  But there might be a lot
+of confusion over this.</p>
+<p>If you have control over both sides, the back-end API and the client, then this is a great strategy
+because you can ensure the header is correctly set.</p>
+<p><strong>Accept Header Version</strong>
+The most RESTful of the bunch, here we specify what version we want by adjusting the Accept header
+appropriately.  This is sometimes suggested as the <em>correct</em> way to do this.</p>
+<p>You, are of course, sending all of your requests with a full <em>Accept</em> header that contains the
+content-type, format, and encoding of the response you expect back, right?  I’m not talking about
+<cite>application/json</cite>, I’m talking about <cite>com.example.Pet/json+gzip</cite>.  Well just add version tag to
+that as well.</p>
+<p>Oh, you aren’t requesting it that way?  You happen to be mortal instead?  Then yes, you probably
+are not going to like this selector, nor are your users.</p>
+<p>It’s also not entirely correct, as it doesn’t technically say what version of the <strong>API</strong> you want,
+it really says what version of the media type you want, which can and will be incongruent.</p>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">Splendor</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">APIs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="schema.html">Schema</a></li>
+<li class="toctree-l1"><a class="reference internal" href="collections.html">Collections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="versioning.html">Versioning</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="organic.html">Organic Development</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, ForgeWorks.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.8.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/blog.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

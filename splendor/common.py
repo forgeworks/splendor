@@ -5,8 +5,8 @@ import types
 from functools import wraps
 
 from .schema import fields, Schematic, Undefined
-from .operation import Operation, Parameter
-from .util import get_schema, build_parameters
+from .operation import Operation, Parameter, build_parameters, MediaType
+from .util import get_schema
 
 
 class OperationTemplate(Schematic):
@@ -26,7 +26,10 @@ def operation_template(fn):
             return OperationTemplate(callable=callable, 
                                      template=fn,
                                      kwargs=kwargs)
-        return fn(callable, schema=schema, **kwargs)
+        if isinstance(schema, Schematic):
+            return fn(callable, schema=schema.__schema__, factory=schema, **kwargs)
+        else:
+            return fn(callable, schema=schema, **kwargs)
 
     # This stuff just lets you do @put or @put(kwarg=value)
     def decorator(callable=None, **kwargs):
@@ -41,11 +44,11 @@ def operation_template(fn):
 
 
 @operation_template
-def put(callable, schema=None, name=None, **kwargs):
+def put(callable, schema=None, factory=Undefined, name=None, **kwargs):
     parameters = build_parameters(callable, ignore=['item'], path="<id>")
 
-    schema = get_schema(schema)
-    name = name or schema.name.lower()
+    media = MediaType.from_schema(schema)
+    name = name or media.schema.name.split('.')[-1].lower()
 
     attrs = dict(
         callable = callable,
@@ -58,10 +61,7 @@ def put(callable, schema=None, name=None, **kwargs):
             'description': f'{name} item to add to the collection',
             'arg': 'item',
             'content': {
-                'application/json': {
-                    'schema': schema,
-                    'examples': schema.examples or Undefined
-                }
+                '*/*': media
             }
         },
         responses = {
@@ -91,7 +91,7 @@ def get(callable, schema=None, name=None, **kwargs):
     parameters = build_parameters(callable, path="<id>")
 
     schema = get_schema(schema)
-    name = name or schema.name.lower()
+    name = name or schema.name.split('.')[-1].lower()
 
     attrs = dict(
         callable = callable,
@@ -124,11 +124,11 @@ def get(callable, schema=None, name=None, **kwargs):
     return op
 
 @operation_template
-def post(callable, schema=None, name=None, **kwargs):
+def post(callable, schema=None, factory=Undefined, name=None, **kwargs):
     parameters = build_parameters(callable, ignore=['item'])
 
-    schema = get_schema(schema)
-    name = name or schema.name.lower()
+    media = MediaType.from_schema(schema)
+    name = name or media.schema.name.split('.')[-1].lower()
 
     attrs = dict(
         callable = callable,
@@ -141,10 +141,7 @@ def post(callable, schema=None, name=None, **kwargs):
             'description': f'{name} item to add to the collection',
             'arg': 'item',
             'content': {
-                'application/json': {
-                    'schema': schema,
-                    'examples': schema.examples or Undefined
-                }
+                '*/*': media
             }
         },
         responses = {
@@ -170,11 +167,11 @@ def post(callable, schema=None, name=None, **kwargs):
 
 
 @operation_template
-def patch(callable, schema=None, name=None, **kwargs):
+def patch(callable, schema=None, factory=Undefined, name=None, **kwargs):
     parameters = build_parameters(callable, ignore=['item'], path="<id>")
 
-    schema = get_schema(schema)
-    name = name or schema.name.lower()
+    media = MediaType.from_schema(schema)
+    name = name or media.schema.name.split('.')[-1].lower()
 
     attrs = dict(
         callable = callable,
@@ -187,10 +184,7 @@ def patch(callable, schema=None, name=None, **kwargs):
             'description': f'{name} item partial to update in the collection',
             'arg': 'item',
             'content': {
-                'application/json': {
-                    'schema': schema,
-                    'examples': schema.examples or Undefined
-                }
+                '*/*': media
             }
         },
         responses = {
@@ -220,7 +214,7 @@ def delete(callable, schema=None, name=None, **kwargs):
     parameters = build_parameters(callable, path="<id>")
 
     schema = get_schema(schema)
-    name = name or schema.name.lower()
+    name = name or schema.name.split('.')[-1].lower()
 
     attrs = dict(
         callable = callable,
@@ -251,7 +245,7 @@ def listing(callable, schema=None, name=None, **kwargs):
     parameters = build_parameters(callable)
 
     schema = get_schema(schema)
-    name = name or schema.name.lower()
+    name = name or schema.name.split('.')[-1].lower()
 
     attrs = dict(
         callable = callable,
