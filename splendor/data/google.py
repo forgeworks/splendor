@@ -24,8 +24,6 @@ class GoogleDataStore(MemoryStore):
         if isinstance(entity, list):
             entity = data.pop()
 
-        print("marshal", schema, entity)
-
         item = schema(**entity)
         self.set_item_key(schema, item, entity.key.flat_path)
         return item
@@ -37,7 +35,6 @@ class GoogleDataStore(MemoryStore):
         raise NotImplementedError()
 
     def load(self, schema, key):
-        print("load", schema, key)
         try:
             key = self.client.key(*key)
             entity = self.client.get(key)

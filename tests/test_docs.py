@@ -27,9 +27,10 @@ def test_quick_start_api_v1(app, client):
     assert r.data.decode('utf-8') == hello()
 
     r = client.get('/v1/openapi.json')
-    assert r.json['info'] == GreetingV1.info
+    from pprint import pprint
+    assert r.json['info'] == api.info.get_schema_value()
     assert r.json['openapi'] == '3.0.1'
-    assert r.json['paths']['/hello']['get']['summary'] == 'Hello'
+    assert r.json['paths']['/hello']['get']['summary'] == 'hello'
 
 
 def test_quick_start_api_v2(app, client):

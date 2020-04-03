@@ -1,279 +1,167 @@
 """
 Common operation factories.
+
+Fundemental Issue:
+    We want to create the operation right away, but we don't have some info:
+        - MediaType
+        - Path
+    
+    We can make a transient object that gets turned into the full Operation at registration
+    We can make the Operation set itself up at registration
+    We can demand the info needed at creation
+
 """
+import functools, inspect
 import types
-from functools import wraps
 
 from .schema import fields, Schematic, Undefined
-from .operation import Operation, Parameter, build_parameters, MediaType
+from .operation import Operation, MediaOperation, Parameter, build_parameters, MediaType, FileType
 from .util import get_schema
 
 
-class OperationTemplate(Schematic):
-    callable = fields.Callable()
-    template = fields.Callable()
-    kwargs = fields.Dict()
+def decorator(func):
+    """Allow to use decorator either with arguments or not."""
 
-    def build(self, binding, schema, **kwargs):
-        kwargs = dict(self.kwargs, schema=schema, **kwargs)
-        return self.template(types.MethodType(self.callable, binding), **kwargs)
+    def is_function(*args, **kw):
+        return (
+            len(args) == 1
+            and len(kw) == 0
+            and (inspect.isfunction(args[0]) or isinstance(args[0], type))
+        )
 
+    @functools.wraps(func)
+    def func_wrapper(*args, **kw):
+        if is_function(*args, **kw):
+            return func(*args, **kw)
 
-def operation_template(fn):
-    "Decorates a function to act as a template, which takes a callable and returns an operation."
-    def wrapper(callable, schema=Undefined, **kwargs):
-        if schema is Undefined:
-            return OperationTemplate(callable=callable, 
-                                     template=fn,
-                                     kwargs=kwargs)
-        if isinstance(schema, Schematic):
-            return fn(callable, schema=schema.__schema__, factory=schema, **kwargs)
-        else:
-            return fn(callable, schema=schema, **kwargs)
+        def functor(user_func):
+            return func(user_func, *args, **kw)
 
-    # This stuff just lets you do @put or @put(kwarg=value)
-    def decorator(callable=None, **kwargs):
-        if not kwargs:
-            return wrapper(callable)
+        return functor
 
-        def inner_wrapper(callable):
-            return wrapper(callable, **kwargs)
-        return inner_wrapper
-
-    return decorator
+    return func_wrapper
 
 
-@operation_template
-def put(callable, schema=None, factory=Undefined, name=None, **kwargs):
-    parameters = build_parameters(callable, ignore=['item'], path="<id>")
+@decorator
+def put(callable, cls=MediaOperation, media=None, extra_tags=[], body_arg="item", **kwargs):
+    def register(op, app, options):
+        m = media or op.media
+        attrs = dict(
+            operation_id=kwargs.get("operation_id", f"{m.name}_{callable.__name__}"),
+            description=op.callable.__doc__ or f"add a new {m.name} item with a known url",
+            tags=[m.name] + extra_tags,
+            request_body={
+                "description": f"{m.name} data that will become the new item",
+                "arg": body_arg,
+                "content": m.get_content_types(),
+            },
+            responses={"200": {"content": m.get_content_types()}},
+            security={f"{m.name}_auth": {f"write:{m.name}"}},
+            **kwargs,
+        )
+        op.update_schema_value(attrs)
 
-    media = MediaType.from_schema(schema)
-    name = name or media.schema.name.split('.')[-1].lower()
-
-    attrs = dict(
-        callable = callable,
-        operation_id = f'put_{name}',
-        description = callable.__doc__ or f'PUT {name} item',
-        method = "put",
-        tags = [name, 'put'] + kwargs.get('extra_tags', []),
-        parameters = parameters + kwargs.get('extra_parameters', []),
-        body = {
-            'description': f'{name} item to add to the collection',
-            'arg': 'item',
-            'content': {
-                '*/*': media
-            }
-        },
-        responses = {
-            "200": {
-                "description": f'{name} item that was added.',
-                "content": {
-                    'application/json': {
-                        'schema': schema
-                    }
-                }
-            }
-        },
-        security = {
-            f'{name}_auth': {
-                'write:{name}',
-                'read:{name}'
-            }
-        }
-    , **kwargs)
-    op = Operation(**attrs)
-    op.__name__ = op.operation_id
-    return op
+    return cls(callable=callable, register_hook=register, **kwargs)
 
 
-@operation_template
-def get(callable, schema=None, name=None, **kwargs):
-    parameters = build_parameters(callable, path="<id>")
+@decorator
+def patch(callable, cls=MediaOperation, media=None, extra_tags=[], body_arg="item", **kwargs):
+    def register(op, app, options):
+        m = media or op.media
+        attrs = dict(
+            operation_id=kwargs.get("operation_id", f"{m.name}_{callable.__name__}"),
+            description=callable.__doc__ or f"update an {m.name} item",
+            tags=[m.name] + extra_tags,
+            request_body={
+                "description": f"{m.name} item partial to update in the collection",
+                "arg": body_arg,
+                "content": m.get_content_types(),
+            },
+            responses={"200": {"content": m.get_content_types()}},
+            security={f"{m.name}_auth": {f"write:{m.name}", f"read:{m.name}"}},
+            **kwargs,
+        )
+        op.update_schema_value(attrs)
 
-    schema = get_schema(schema)
-    name = name or schema.name.split('.')[-1].lower()
+    return cls(callable=callable, register_hook=register, **kwargs)
 
-    attrs = dict(
-        callable = callable,
-        operation_id = f'get_{name}',
-        description = callable.__doc__ or f'GET {name} item by id',
-        method = "get",
-        tags = [name, 'get'] + kwargs.get('extra_tags', []),
-        parameters = parameters + kwargs.get('extra_parameters', []),
-        responses = {
-            "200": {
-                "description": f'{name} item found in the datastore.',
-                "content": {
-                    'application/json': {
-                        'schema': schema
-                    }
+
+@decorator
+def post(callable, cls=MediaOperation, media=None, extra_tags=[], body_arg="item", **kwargs):
+    def register(op, app, options):
+        m = media or op.media
+        attrs = dict(
+            operation_id=kwargs.get("operation_id", f"{m.name}_{callable.__name__}"),
+            description=callable.__doc__ or f"create a new {m.name} item without a known url",
+            tags=[m.name] + extra_tags,
+            request_body={
+                "description": f"{m.name} data that will become a new item",
+                "arg": body_arg,
+                "content": m.get_content_types(),
+            },
+            responses={"200": {"content": m.get_content_types()}},
+            security={f"{m.name}_auth": {f"write:{m.name}", f"read:{m.name}"}},
+            **kwargs,
+        )
+        op.update_schema_value(attrs)
+
+    return cls(callable=callable, register_hook=register, **kwargs)
+
+
+@decorator
+def delete(callable, cls=MediaOperation, media=None, extra_tags=[], body_arg="item", **kwargs):
+    def register(op, app, options):
+        m = media or op.media
+        attrs = dict(
+            operation_id=kwargs.get("operation_id", f"{m.name}_{callable.__name__}"),
+            description=callable.__doc__ or f"delete an item in the collection",
+            tags=[m.name] + extra_tags,
+            responses={"200": {"description": "The resource was deleted successfully."}},
+            security={f"{m.name}_auth": {f"write:{m.name}"}},
+            **kwargs,
+        )
+        op.update_schema_value(attrs)
+
+    return cls(callable=callable, register_hook=register, **kwargs)
+
+
+@decorator
+def get(callable, cls=MediaOperation, media=None, extra_tags=[], body_arg="item", **kwargs):
+    def register(op, app, options):
+        m = media or op.media
+        attrs = dict(
+            operation_id=kwargs.get("operation_id", f"{m.name}_{callable.__name__}"),
+            description=callable.__doc__ or f"get {m.name} item",
+            summary=f"get {m.name} item",
+            tags=[m.name] + extra_tags,
+            responses={"200": {"content": m.get_content_types()}},
+            security={f"{m.name}_auth": {f"read:{m.name}"}},
+            **kwargs,
+        )
+        op.update_schema_value(attrs)
+
+    return cls(callable=callable, register_hook=register, **kwargs)
+
+
+@decorator
+def query(callable, cls=MediaOperation, media=None, extra_tags=[], body_arg="item", **kwargs):
+    def register(op, app, options):
+        m = media or op.media
+        attrs = dict(
+            operation_id=kwargs.get("operation_id", f"{m.name}_{callable.__name__}"),
+            description=callable.__doc__ or "",
+            summary=f"{m.name} query",
+            tags=[m.name] + extra_tags,
+            responses={
+                "200": {
+                    "description": f"a list of {m.name} items as results",
+                    "content": m.get_result_content_types(),
                 }
             },
-            "404": {
-                "description": f'{name} item cannot be found.',
-            }
-        },
-        security = {
-            f'{name}_auth': {
-                'read:{name}'
-            }
-        }
-    , **kwargs)
-    op = Operation(**attrs)
-    op.__name__ = op.operation_id
-    return op
+            security={f"{m.name}_auth": {f"read:{m.name}"}},
+            **kwargs,
+        )
+        op.update_schema_value(attrs)
 
-@operation_template
-def post(callable, schema=None, factory=Undefined, name=None, **kwargs):
-    parameters = build_parameters(callable, ignore=['item'])
-
-    media = MediaType.from_schema(schema)
-    name = name or media.schema.name.split('.')[-1].lower()
-
-    attrs = dict(
-        callable = callable,
-        operation_id = f'post_{name}',
-        description = callable.__doc__ or f'POST {name} item',
-        method = "post",
-        tags = [name, 'post'] + kwargs.get('extra_tags', []),
-        parameters = parameters + kwargs.get('extra_parameters', []),
-        body = {
-            'description': f'{name} item to add to the collection',
-            'arg': 'item',
-            'content': {
-                '*/*': media
-            }
-        },
-        responses = {
-            "200": {
-                "description": f'{name} item that was added.',
-                "content": {
-                    'application/json': {
-                        'schema': schema
-                    }
-                }
-            }
-        },
-        security = {
-            f'{name}_auth': {
-                'write:{name}',
-                'read:{name}'
-            }
-        }
-    , **kwargs)
-    op = Operation(**attrs)
-    op.__name__ = op.operation_id
-    return op
-
-
-@operation_template
-def patch(callable, schema=None, factory=Undefined, name=None, **kwargs):
-    parameters = build_parameters(callable, ignore=['item'], path="<id>")
-
-    media = MediaType.from_schema(schema)
-    name = name or media.schema.name.split('.')[-1].lower()
-
-    attrs = dict(
-        callable = callable,
-        operation_id = f'patch_{name}',
-        description = callable.__doc__ or f'PATCH {name} item',
-        method = "patch",
-        tags = [name, 'patch'] + kwargs.get('extra_tags', []),
-        parameters = parameters + kwargs.get('extra_parameters', []),
-        body = {
-            'description': f'{name} item partial to update in the collection',
-            'arg': 'item',
-            'content': {
-                '*/*': media
-            }
-        },
-        responses = {
-            "200": {
-                "description": f'Updated {name} item.',
-                "content": {
-                    'application/json': {
-                        'schema': schema
-                    }
-                }
-            }
-        },
-        security = {
-            f'{name}_auth': {
-                'write:{name}',
-                'read:{name}'
-            }
-        }
-    , **kwargs)
-    op = Operation(**attrs)
-    op.__name__ = op.operation_id
-    return op
-
-
-@operation_template
-def delete(callable, schema=None, name=None, **kwargs):
-    parameters = build_parameters(callable, path="<id>")
-
-    schema = get_schema(schema)
-    name = name or schema.name.split('.')[-1].lower()
-
-    attrs = dict(
-        callable = callable,
-        operation_id = f'delete_{name}',
-        description = callable.__doc__ or f'DELETE {name} item by key',
-        method = "delete",
-        tags = [name, 'delete'] + kwargs.get('extra_tags', []),
-        parameters = parameters + kwargs.get('extra_parameters', []),
-        responses = {
-            "200": {
-                "description": f'The {name} item was deleted.'
-            }
-        },
-        security = {
-            f'{name}_auth': {
-                'write:{name}',
-                'read:{name}'
-            }
-        }
-    , **kwargs)
-    op = Operation(**attrs)
-    op.__name__ = op.operation_id
-    return op
-    
-
-@operation_template
-def listing(callable, schema=None, name=None, **kwargs):
-    parameters = build_parameters(callable)
-
-    schema = get_schema(schema)
-    name = name or schema.name.split('.')[-1].lower()
-
-    attrs = dict(
-        callable = callable,
-        operation_id = f'list_{name}',
-        description = callable.__doc__ or f'Get a list of {name} items',
-        method = "get",
-        tags = [name, 'listing'] + kwargs.get('extra_tags', []),
-        parameters = parameters + kwargs.get('extra_parameters', []),
-        responses = {
-            "200": {
-                "description": f'A list of {name} item results.',
-                "content": {
-                    'application/json': {
-                        'schema': {
-                            'type': 'list',
-                            'items': schema
-                        }
-                    }
-                }
-            }
-        },
-        security = {
-            f'{name}_auth': {
-                'read:{name}'
-            }
-        }
-    , **kwargs)
-    op = Operation(**attrs)
-    op.__name__ = op.operation_id
-    return op
+    return cls(callable=callable, register_hook=register, **kwargs)
 

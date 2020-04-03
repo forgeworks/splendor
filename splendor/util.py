@@ -12,7 +12,8 @@ def merge_paths(*dicts):
     for d in dicts:
         if isinstance(d, fields.Field):
             d = d.get_default(None)
-        result.update(d)
+        else:
+            result.update(d)
     return result
 
 def get_schema(instance):

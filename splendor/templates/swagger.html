@@ -1,30 +1,31 @@
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title>{{ title }}</title>
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.19.3/swagger-ui.css" integrity="sha256-uMNvfJ6RsvDYY7ULF89CVLPUodIKJ0Y7vhSc7COi/UE=" crossorigin="anonymous" />
-</head>
-<body>
+    <script src="//unpkg.com/swagger-ui-dist@3/swagger-ui-bundle.js"></script>
+    <link
+      rel="stylesheet"
+      href="//unpkg.com/swagger-ui-dist@3/swagger-ui.css"
+    />
+  </head>
+  <body>
     <div id="swagger-ui"></div>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.19.3/swagger-ui-bundle.js" integrity="sha256-oXa05rB98I1UEtBc3oeU9JT7Rvdnb6hdCE+8nWO4WuU=" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.19.3/swagger-ui-standalone-preset.js" integrity="sha256-m0KJX1sNDtfPeY979exlrm9ZTJjW1ycshfVAvoLCgfU=" crossorigin="anonymous"></script>
 
     <script>
-        window.onload = function() {
-            var ui = SwaggerUIBundle({
-                url: "{{ spec_url }}",
-                dom_id: '#swagger-ui',
-                presets: [
-                    SwaggerUIBundle.presets.apis,
-                    SwaggerUIStandalonePreset
-                ]
-            })
-            window.ui = ui;
-        }
+      window.onload = function() {
+        var ui = SwaggerUIBundle({
+          url: "{{ spec_url }}",
+          dom_id: "#swagger-ui",
+          presets: [
+            SwaggerUIBundle.presets.apis,
+            SwaggerUIBundle.SwaggerUIStandalonePreset
+          ]
+        });
+        window.ui = ui;
+      };
     </script>
-</body>
+  </body>
 </html>

@@ -1,73 +1,156 @@
+import re
 from collections.abc import Callable
 from urllib.parse import urlparse
 from pathlib import PurePosixPath
 
 from .schema import Schematic, Configurable, fields
-from .operation import Operation, Response, Parameter, RequestBody, Header, Link, build_parameters
-from . import common
-from .data import DataKey
-from .util import get_schema
+from .operation import (
+    Operation,
+    Response,
+    Parameter,
+    RequestBody,
+    Header,
+    Link,
+    build_parameters,
+    QueryString,
+)
+from .collection import Collection
 from flask import Blueprint, jsonify, render_template, current_app, request
 
 
 class Contact(Schematic):
-    name = fields.String(required=True, description="The identifying name of the contact person/organization.")
-    url = fields.String(description="The URL pointing to the contact information. MUST be in the format of a URL.")
-    email = fields.String(email="The email address of the contact person/organization. MUST be in the format of an email address.")
+    name = fields.String(
+        required=True, description="The identifying name of the contact person/organization.",
+    )
+    url = fields.String(
+        description="The URL pointing to the contact information. MUST be in the format of a URL."
+    )
+    email = fields.String(
+        email="The email address of the contact person/organization. MUST be in the format of an email address."
+    )
+
 
 class License(Schematic):
     name = fields.String(required=True, description="The license name used for the API.")
-    url = fields.String(description="A URL to the license used for the API. MUST be in the format of a URL.")
+    url = fields.String(
+        description="A URL to the license used for the API. MUST be in the format of a URL."
+    )
+
 
 class Server(Schematic):
     url = fields.String(required=True)
     description = fields.String(required=True)
 
+
 class ExternalDoc(Schematic):
-    description = fields.String(description='A short description of the target documentation. CommonMark syntax MAY be used for rich text representation.')
-    url = fields.URIString(required=True, description='The URL for the target documentation. Value MUST be in the format of a URL.')
+    description = fields.String(
+        description="A short description of the target documentation. CommonMark syntax MAY be used for rich text representation."
+    )
+    url = fields.URIString(
+        required=True,
+        description="The URL for the target documentation. Value MUST be in the format of a URL.",
+    )
+
 
 class Info(Schematic):
     title = fields.String(required=True, description="The title of the application.")
-    description = fields.String(description="A short description of the application. CommonMark syntax MAY be used for rich text representation.")
-    terms_of_service = fields.URIString(description="A URL to the Terms of Service for the API. MUST be in the format of a URL.")
+    description = fields.String(
+        description="A short description of the application. CommonMark syntax MAY be used for rich text representation."
+    )
+    terms_of_service = fields.URIString(
+        description="A URL to the Terms of Service for the API. MUST be in the format of a URL."
+    )
     contact = fields.InstanceOf(Contact)
     license = fields.InstanceOf(License)
-    version = fields.String(required=True, description="The version of the OpenAPI document (which is distinct from the OpenAPI Specification version or the API implementation version).")
+    version = fields.String(
+        required=True,
+        description="The version of the OpenAPI document (which is distinct from the OpenAPI Specification version or the API implementation version).",
+    )
+
 
 class OAuthFlow(Schematic):
-    authorization_url = fields.URIString(required=True, description="The authorization URL to be used for this flow. This MUST be in the form of a URL.")
-    token_url = fields.URIString(required=True, description="The token URL to be used for this flow. This MUST be in the form of a URL.")
-    refresh_url = fields.URIString(description='The URL to be used for obtaining refresh tokens. This MUST be in the form of a URL.')
-    scopes = fields.String(required=True, map=True, description='The available scopes for the OAuth2 security scheme. A map between the scope name and a short description for it.')
+    authorization_url = fields.URIString(
+        required=True,
+        description="The authorization URL to be used for this flow. This MUST be in the form of a URL.",
+    )
+    token_url = fields.URIString(
+        required=True,
+        description="The token URL to be used for this flow. This MUST be in the form of a URL.",
+    )
+    refresh_url = fields.URIString(
+        description="The URL to be used for obtaining refresh tokens. This MUST be in the form of a URL."
+    )
+    scopes = fields.String(
+        required=True,
+        map=True,
+        description="The available scopes for the OAuth2 security scheme. A map between the scope name and a short description for it.",
+    )
+
 
 class OAuthFlowSet(Schematic):
     implicit = fields.InstanceOf(OAuthFlow, description="Configuration for the OAuth Implicit flow")
-    password = fields.InstanceOf(OAuthFlow, description="Configuration for the OAuth Resource Owner Password flow")
-    client_credentials = fields.InstanceOf(OAuthFlow, description="Configuration for the OAuth Client Credentials flow. Previously called application in OpenAPI 2.0.")
-    authorization_code = fields.InstanceOf(OAuthFlow, description="Configuration for the OAuth Authorization Code flow. Previously called accessCode in OpenAPI 2.0.")
+    password = fields.InstanceOf(
+        OAuthFlow, description="Configuration for the OAuth Resource Owner Password flow",
+    )
+    client_credentials = fields.InstanceOf(
+        OAuthFlow,
+        description="Configuration for the OAuth Client Credentials flow. Previously called application in OpenAPI 2.0.",
+    )
+    authorization_code = fields.InstanceOf(
+        OAuthFlow,
+        description="Configuration for the OAuth Authorization Code flow. Previously called accessCode in OpenAPI 2.0.",
+    )
+
 
 class SecurityScheme(Schematic):
-    type = fields.Enum(["apiKey", "http", "oauth2", "openIdConnect"], required=True, description='The type of the security scheme.')
-    description = fields.String(description="A short description for security scheme. CommonMark syntax MAY be used for rich text representation.")
-    name = fields.String(description='The name of the header, query or cookie parameter to be used.')
-    location = fields.Enum(["query", "header", "cookie"], description='The location of the API key.', alias='in')
-    scheme = fields.String(description="The name of the HTTP Authorization scheme to be used in the Authorization header as defined in RFC7235.")
-    bearerFormat = fields.String(description="A hint to the client to identify how the bearer token is formatted. Bearer tokens are usually generated by an authorization server, so this information is primarily for documentation purposes.")
-    flows = fields.InstanceOf(OAuthFlowSet, description="An object containing configuration information for the flow types supported.")
-    open_id_connect_url = fields.URIString(description='OpenId Connect URL to discover OAuth2 configuration values. This MUST be in the form of a URL.')
+    type = fields.Enum(
+        ["apiKey", "http", "oauth2", "openIdConnect"],
+        required=True,
+        description="The type of the security scheme.",
+    )
+    description = fields.String(
+        description="A short description for security scheme. CommonMark syntax MAY be used for rich text representation."
+    )
+    name = fields.String(
+        description="The name of the header, query or cookie parameter to be used."
+    )
+    location = fields.Enum(
+        ["query", "header", "cookie"], description="The location of the API key.", alias="in",
+    )
+    scheme = fields.String(
+        description="The name of the HTTP Authorization scheme to be used in the Authorization header as defined in RFC7235."
+    )
+    bearerFormat = fields.String(
+        description="A hint to the client to identify how the bearer token is formatted. Bearer tokens are usually generated by an authorization server, so this information is primarily for documentation purposes."
+    )
+    flows = fields.InstanceOf(
+        OAuthFlowSet,
+        description="An object containing configuration information for the flow types supported.",
+    )
+    open_id_connect_url = fields.URIString(
+        description="OpenId Connect URL to discover OAuth2 configuration values. This MUST be in the form of a URL."
+    )
+
 
 class Example(Schematic):
-    summary = fields.String(required=True, description='Short description for the example.')
-    description = fields.String(description='Long description for the example. CommonMark syntax MAY be used for rich text representation.')
-    value = fields.Any(description='Embedded literal example. The value field and externalValue field are mutually exclusive. To represent examples of media types that cannot naturally represented in JSON or YAML, use a string value to contain the example, escaping where necessary.')
-    external_value = fields.URIString(description='A URL that points to the literal example. This provides the capability to reference examples that cannot easily be included in JSON or YAML documents. The value field and externalValue field are mutually exclusive.')
+    summary = fields.String(required=True, description="Short description for the example.")
+    description = fields.String(
+        description="Long description for the example. CommonMark syntax MAY be used for rich text representation."
+    )
+    value = fields.Any(
+        description="Embedded literal example. The value field and externalValue field are mutually exclusive. To represent examples of media types that cannot naturally represented in JSON or YAML, use a string value to contain the example, escaping where necessary."
+    )
+    external_value = fields.URIString(
+        description="A URL that points to the literal example. This provides the capability to reference examples that cannot easily be included in JSON or YAML documents. The value field and externalValue field are mutually exclusive."
+    )
+
 
 class PathItem(Schematic):
     summary = fields.String()
     description = fields.String()
     get = fields.InstanceOf(Operation)
     put = fields.InstanceOf(Operation)
+    post = fields.InstanceOf(Operation)
     delete = fields.InstanceOf(Operation)
     options = fields.InstanceOf(Operation)
     head = fields.InstanceOf(Operation)
@@ -76,13 +159,15 @@ class PathItem(Schematic):
     servers = fields.InstanceOf(Server, repeated=True)
     parameters = fields.InstanceOf(Parameter, repeated=True)
 
+    collection = fields.InstanceOf(Collection)
+
     def __init__(self, obj=None, **kwargs):
         if isinstance(obj, Collection):
-            assert False, "Fix me"
+            kwargs.setdefault("collection", obj)
         elif isinstance(obj, Operation):
             kwargs.setdefault(obj.method.lower(), obj.summary)
         elif isinstance(obj, Callable):
-            kwargs.setdefault('get', Operation(obj))
+            kwargs.setdefault("get", Operation(callable=obj))
         super().__init__(**kwargs)
 
     def register(self, app, options, first_registration=False):
@@ -90,6 +175,10 @@ class PathItem(Schematic):
             if isinstance(v, Operation):
                 options = dict(options, methods=[method])
                 v.register(app, options, first_registration=first_registration)
+
+        if hasattr(self, "collection"):
+            self.collection.register(app, options, first_registration=first_registration)
+
 
 class Components(Schematic):
     schema = fields.SchemaField(map=True)
@@ -103,192 +192,75 @@ class Components(Schematic):
     callbacks = fields.InstanceOf(PathItem, map=True)
     parameters = fields.InstanceOf(Parameter, map=True)
 
+
 class Tag(Schematic):
-    name = fields.String(required=True, description='The name of the tag.')
-    description = fields.String(description='A short description for the tag. CommonMark syntax MAY be used for rich text representation.')
+    name = fields.String(required=True, description="The name of the tag.")
+    description = fields.String(
+        description="A short description for the tag. CommonMark syntax MAY be used for rich text representation."
+    )
     external_docs = fields.InstanceOf(ExternalDoc)
-
-class Collection(Schematic):
-    """
-    A collection is a Splendor specific construct that describes a group of operations that have a common schema.
-    """
-    title = fields.String(required=True)
-    schema = fields.AnyOf([fields.SubclassOf(Schematic), fields.SchemaField()], default=None)
-    item_factory = fields.Callable(export=False, default=None)
-    auditor = fields.Callable(default=None)
-    storage = fields.Duck(["save", "load", "delete"])
-    filters = fields.InstanceOf(fields.Field, map=True)
-    paths = fields.Dict(map=True, default={
-        '/':        {'get': 'list_items',
-                     'post': 'post_item'},
-        '/<id>':    {'get': 'get_item',
-                     'put': 'put_item',
-                     'patch': 'patch_item',
-                     'delete': 'delete_item'}
-    })
-    url_prefix = fields.InstanceOf(PurePosixPath, export=False)
-
-    ### Meta ###
-    def set_schema_value(self, value):
-        if 'schema' in value:
-            schema = value['schema']
-            if hasattr(schema, '__schema__'):
-                value.setdefault('item_factory', lambda x: schema(**x))
-                value['schema'] = schema.__schema__
-        super().set_schema_value(value)
-
-    def __repr__(self):
-        return f'{self.__class__}({self.title})'
-
-    def register_operation(self, app, options, fn, first_registration=False):
-        path = PurePosixPath(options.get('url_prefix', ''))
-        options = dict(options, collection=self)
-        if isinstance(fn, str):
-            fn = getattr(self, fn)
-        if isinstance(fn, common.OperationTemplate):
-            fn = fn.build(self, self.schema, factory=self.item_factory, name=self.name)
-        if isinstance(fn, Operation):
-            fn.operation_id = f'{self.name}:{fn.__name__}'
-            fn.register(app, options, first_registration=first_registration)
-        else:
-            fn = Operation(callable=fn, 
-                           operation_id=f'{self.name}:{fn.__name__}',
-                           method=options.get('methods', ['get'])[0].lower(),
-                           description=fn.__doc__)
-            fn.register(app, options, first_registration=first_registration)
-        return fn
-
-    def register(self, app, options, first_registration=False):
-        self.url_prefix = PurePosixPath(options.get('url_prefix', ''))
-
-        for path, mapping_or_fn in self.paths.items():
-            path = self.url_prefix / path.lstrip('/')
-            options = dict(options, url_prefix=path)
-
-            if isinstance(mapping_or_fn, dict):
-                for method, view_func in mapping_or_fn.items():
-                    options = dict(options, methods=[method])
-                    self.register_operation(app, options, view_func, first_registration=first_registration)
-            else:
-                self.register_operation(app, options, mapping_or_fn, first_registration=first_registration)
-
-    @property
-    def name(self):
-        return self.title.lower()
-
-    ### Interface ###
-    def save(self, key, item, partial=False):
-        if isinstance(item, Schematic):
-            item = item.get_schema_value()
-        item = self.schema(item)
-        key, item = self.storage.save(key, item, partial)
-        if self.item_factory and item is not None:
-            item = self.item_factory(item)
-        return key, item
-
-    def load(self, key):
-        item = self.storage.load(key)
-        if self.item_factory and item is not None:
-            item = self.item_factory( item )
-        return item
-
-    def delete(self, key):
-        return self.storage.delete(key)
-
-    def query(self, **filters):
-        return ((k, self.item_factory(data)) for k, data in self.storage.query(filters) if data is not None)
-
-    def audit(self, perm, **args):
-        if self.auditor:
-            self.auditor(self, perm, **args)
-
-    def enrich(self, key, item):
-        return item
-
-    def enrich_results(self, results):
-        results = [self.enrich(key, item) for key, item in results]
-        return results
-
-    def get_item_key(self, item):
-        key = [self.schema.name]
-
-    ### Operations ###
-    @common.listing
-    def list_items(self, q=""):
-        self.audit('list', query=q)
-        return self.enrich_results(self.query(q=q))
-    
-    @common.post
-    def post_item(self, item):
-        self.audit('post', item=item)
-        key, item = self.save(DataKey(get_schema(self.schema).name, item.id), item)
-        return self.enrich(key, item)
-    
-    @common.get
-    def get_item(self, id):
-        key = DataKey(get_schema(self.schema).name, id)
-        self.audit('get:key', key=key)
-        item = self.load(key)
-        if item is None:
-            return 404
-        self.audit('get:item', key=key, item=item)
-        return self.enrich(key, item)
-    
-    @common.put
-    def put_item(self, id, item):
-        key = DataKey(get_schema(self.schema).name, id)
-        self.audit('put', key=key, item=item)
-        key, item = self.save(key, item)
-        return self.enrich(key, item)
-    
-    @common.patch
-    def patch_item(self, id, item):
-        key = DataKey(get_schema(self.schema).name, id)
-        self.audit('patch', key=key, item=item)
-        key, item = self.save(key, item, partial=True)
-        return self.enrich(key, item)
-    
-    @common.delete
-    def delete_item(self, id):
-        key = DataKey(get_schema(self.schema).name, id)
-        self.audit('delete', key=key)
-        self.delete(key)
-
-
-class Storage(Configurable):
-    collection = fields.InstanceOf(Collection)
-
-    def save(self, schema, key, item, partial=False):
-        pass
-
-    def load(self, schema, key):
-        pass
-
-    def delete(self, schema, key):
-        pass
-
-    def query(self, schema, filters):
-        pass
 
 
 class Api(Schematic):
-    openapi = fields.String(required=True, default='3.0.1', description='This string MUST be the semantic version number of the OpenAPI Specification version that the OpenAPI document uses. The openapi field SHOULD be used by tooling specifications and clients to interpret the OpenAPI document. This is not related to the API info.version string.')
-    info = fields.InstanceOf(Info, required=True, description='Provides metadata about the API. The metadata MAY be used by tooling as required.')
-    servers = fields.InstanceOf(Server, repeated=True, description='An array of Server Objects, which provide connectivity information to a target server. If the servers property is not provided, or is an empty array, the default value would be a Server Object with a url value of /.')
-    paths = fields.InstanceOf(PathItem, map=True, description='The available paths and operations for the API.')
-    components = fields.InstanceOf(Components, description='An element to hold various schemas for the specification.')
-    security = fields.List(map=True, items={'type': 'str'}, description='A declaration of which security mechanisms can be used across the API. The list of values includes alternative security requirement objects that can be used. Only one of the security requirement objects need to be satisfied to authorize a request. Individual operations can override this definition.')
-    tags = fields.InstanceOf(Tag, repeated=True, description='A list of tags used by the specification with additional metadata. The order of the tags can be used to reflect on their order by the parsing tools. Not all tags that are used by the Operation Object must be declared. The tags that are not declared MAY be organized randomly or based on the tools\' logic. Each tag name in the list MUST be unique.')
-    external_docs = fields.InstanceOf(ExternalDoc, description="A list of external doc objects to reference.")
-    swagger_path = fields.String(export=False, default="swagger", description="The relative url path from our base that should respond with an embedded swagger app.  Set to None to disable this feature.")
-    spec_path = fields.String(export=False, default="openapi.json", description="The relative url path from our base that should respond with our open api json document.  Set to None to disable this feature.")
-    _url_prefix = fields.InstanceOf(PurePosixPath, export=False, description="The prefix that this API lives at in the flask App.", default="/")
-    _collections = fields.InstanceOf(Collection, map=True, export=False, description="All collections registered to the api.")
+    openapi = fields.String(
+        required=True,
+        default="3.0.1",
+        description="This string MUST be the semantic version number of the OpenAPI Specification version that the OpenAPI document uses. The openapi field SHOULD be used by tooling specifications and clients to interpret the OpenAPI document. This is not related to the API info.version string.",
+    )
+    info = fields.InstanceOf(
+        Info,
+        required=True,
+        description="Provides metadata about the API. The metadata MAY be used by tooling as required.",
+    )
+    servers = fields.InstanceOf(
+        Server,
+        repeated=True,
+        description="An array of Server Objects, which provide connectivity information to a target server. If the servers property is not provided, or is an empty array, the default value would be a Server Object with a url value of /.",
+    )
+    paths = fields.InstanceOf(
+        PathItem, map=True, description="The available paths and operations for the API.",
+    )
+    components = fields.InstanceOf(
+        Components, description="An element to hold various schemas for the specification.",
+    )
+    security = fields.List(
+        map=True,
+        items={"type": "str"},
+        description="A declaration of which security mechanisms can be used across the API. The list of values includes alternative security requirement objects that can be used. Only one of the security requirement objects need to be satisfied to authorize a request. Individual operations can override this definition.",
+    )
+    tags = fields.InstanceOf(
+        Tag,
+        repeated=True,
+        description="A list of tags used by the specification with additional metadata. The order of the tags can be used to reflect on their order by the parsing tools. Not all tags that are used by the Operation Object must be declared. The tags that are not declared MAY be organized randomly or based on the tools' logic. Each tag name in the list MUST be unique.",
+    )
+    external_docs = fields.InstanceOf(
+        ExternalDoc, description="A list of external doc objects to reference."
+    )
+    swagger_path = fields.String(
+        internal=False,
+        default="swagger",
+        description="The relative url path from our base that should respond with an embedded swagger app.  Set to None to disable this feature.",
+    )
+    spec_path = fields.String(
+        internal=False,
+        default="openapi.json",
+        description="The relative url path from our base that should respond with our open api json document.  Set to None to disable this feature.",
+    )
+    _url_prefix = fields.InstanceOf(
+        PurePosixPath,
+        internal=False,
+        description="The prefix that this API lives at in the flask App.",
+        default="/",
+    )
+    _collections = fields.InstanceOf(
+        Collection, map=True, internal=False, description="All collections registered to the api.",
+    )
 
     def register(self, app, options, first_registration=False):
-        self._url_prefix = PurePosixPath(options.get('url_prefix', '/'))
+        self._url_prefix = PurePosixPath(options.get("url_prefix", "/"))
+
         for path, resource in self.paths.items():
-            path = self._url_prefix / path.lstrip('/')
+            path = self._url_prefix / path.lstrip("/")
 
             if isinstance(resource, type):
                 resource = resource()
@@ -296,52 +268,114 @@ class Api(Schematic):
             options = dict(options, url_prefix=path)
             resource.register(app, options, first_registration=first_registration)
 
-            if isinstance(resource, Collection):
-                self._collections[resource.name] = resource
+            if hasattr(resource, "collection"):
+                self._add_collection(path, resource.collection)
 
         if self.spec_path is not None:
-            app.add_url_rule(str(self._url_prefix / self.spec_path), view_func=self.spec_view, methods=["GET"])
+            app.add_url_rule(
+                str(self._url_prefix / self.spec_path), view_func=self.spec_view, methods=["GET"],
+            )
 
         if self.swagger_path is not None:
-            app.add_url_rule(str(self._url_prefix / self.swagger_path), view_func=self.swagger_view, methods=["GET"])
-
+            app.add_url_rule(
+                str(self._url_prefix / self.swagger_path),
+                view_func=self.swagger_view,
+                methods=["GET"],
+            )
 
         if first_registration:
             import jinja2, os
 
-            self.jinja_loader = jinja2.ChoiceLoader([
-                app.jinja_loader,
-                jinja2.FileSystemLoader([os.path.join( os.path.dirname(__file__), 'templates' )])
-            ])
+            self.jinja_loader = jinja2.ChoiceLoader(
+                [
+                    app.jinja_loader,
+                    jinja2.FileSystemLoader([os.path.join(os.path.dirname(__file__), "templates")]),
+                ]
+            )
 
     @property
     def name(self):
         return f"{self.info.title}_{self.info.version}"
-    
+
     def spec_view(self):
-        spec = self.marshal_as('json')
-        if 'SPLENDOR_ADD_SERVERS' not in current_app.config:
+        spec = self.marshal_as("json")
+
+        if "SPLENDOR_ADD_SERVERS" not in current_app.config:
             url = urlparse(request.base_url)
-            url = f'{url.scheme}://{url.netloc}{self._url_prefix}'
-            spec['servers'] = spec.get('servers', []) + [{'url': url, 'description': 'This Server'}]
+            url = f"{url.scheme}://{url.netloc}{self._url_prefix}"
+            spec["servers"] = spec.get("servers", []) + [{"url": url, "description": "This Server"}]
         else:
-            spec['servers'] = spec.get('servers', []) + current_app.config['SPLENDOR_ADD_SERVERS']
+            spec["servers"] = spec.get("servers", []) + current_app.config["SPLENDOR_ADD_SERVERS"]
+
+        hoist_collections(spec, self._url_prefix)
+
         return jsonify(spec)
 
     def swagger_view(self):
-        return render_template('swagger.html', spec_url=str(self._url_prefix / self.spec_path))
+        return render_template("swagger.html", spec_url=str(self._url_prefix / self.spec_path))
+
+    def _add_collection(self, path, collection):
+        self._collections[str(path)] = collection
 
 
+def hoist_collections(spec, root_url):
+    """
+    Goes through an OpenAPI spec and moves collection data where it should go.
+    """
+    flat, collections = flatten_paths(spec["paths"], PurePosixPath(root_url))
+    spec["paths"] = flat
+    spec["collections"] = collections
 
 
-# TODO: 
-# Register API
-# Datastore
-# Extra posts
+def flatten_paths(paths, base_url):
+    """
+    Returns (`flat`, `collections`)
+
+    Where `flat` is a mapping {path -> Path Item} of paths in a collection path tree, and 
+    `collections` is a list of collections found.
+    """
+    flat = {}
+    collections = []
+    for path, item in paths.items():
+        path = base_url / path.lstrip("/")
+        if "collection" in item:
+            collections.append(item["collection"])
+            f, c = flatten_paths(item["collection"]["paths"], path)
+            flat.update(f)
+            collections.extend(c)
+        else:
+            flat[openapi_style_path(path)] = lowercase_dictionary_keys(item)
+    return flat, collections
+
+
+flask_path = re.compile(r"\<(.+:)?(.+)\>")
+
+
+def openapi_style_path(path):
+    parts = str(path).split("/")
+    result = []
+    for part in parts:
+        m = flask_path.match(part)
+        if not m:
+            print("NOT M", part)
+            result.append(part)
+            continue
+        result.append("{" + m.groups()[1] + "}")
+    return "/".join(result)
+
+
+def lowercase_dictionary_keys(dictionary):
+    """
+    Returns a dictionary where all keys are lowercase.
+    """
+    result = {}
+    for k, v in dictionary.items():
+        result[k.lower()] = v
+    return result
+
+
+# TODO:
 # Security
-# Responses
-# Respond sensitive to Accept
-# Export
 # Figure out Changelogs
 # Figure out communication management
 

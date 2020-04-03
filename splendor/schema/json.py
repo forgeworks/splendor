@@ -760,3 +760,4 @@ class Format(Constraint):
 
 ### Quick Schemas ###
 system.Object = system.schema({'type': 'object'})
+system.String = system.schema({'type': 'string'})

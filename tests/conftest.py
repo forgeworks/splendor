@@ -1,4 +1,5 @@
-import pytest
+import pytest, logging
+
 
 @pytest.fixture
 def app():

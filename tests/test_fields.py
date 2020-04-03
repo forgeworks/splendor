@@ -53,4 +53,13 @@ def test_name():
     
     assert A.__schema__.name == 'splendor.A'
 
+
+def test_required():
+    class A(Schematic):
+        name = String(required=True)
     
+    a = A()
+    assert not a.validate()
+
+    a = A(name="bob")
+    assert a.validate()

@@ -64,7 +64,7 @@ class DataStore(Configurable):
 
 
 class MemoryStore(DataStore):
-    data = fields.Field(default=lambda: defaultdict(dict))
+    data = fields.Field(default_factory=lambda: defaultdict(dict))
 
     def delete(self, key):
         self.data.pop(str(DataKey(key)), None)
@@ -78,7 +78,7 @@ class MemoryStore(DataStore):
             return key, existing
         else:
             self.data[str(key)] = item
-        
+
         return key, item
 
     def load(self, key):

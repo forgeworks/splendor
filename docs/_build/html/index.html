@@ -38,7 +38,7 @@
 <p>Splendor is an OpenAPI compatible Python web API framework built on top of <a class="reference external" href="http://flask.pocoo.org/">Flask</a>.</p>
 <p>We focus on <a class="reference internal" href="collections.html#collections"><span class="std std-ref">Collections</span></a> as a primary construct, tying together data, permissions, and business
 logic in an elegant way that can be immediately imported into tools like Swagger.</p>
-<p>We emphasize <a class="reference internal" href="philosophy.html#organic-development"><span class="std std-ref">Organic Development</span></a> of APIs by scaffolding the process from quick <em>iteration</em> to
+<p>We emphasize <span class="xref std std-ref">Organic Development</span> of APIs by scaffolding the process from quick <em>iteration</em> to
 solid, well tested, documented, and importantly, <em>maintainable</em> versions.</p>
 <div class="section" id="user-s-guide">
 <h2>User’s Guide<a class="headerlink" href="#user-s-guide" title="Permalink to this headline">¶</a></h2>
@@ -87,97 +87,16 @@ solid, well tested, documented, and importantly, <em>maintainable</em> versions.
 </ul>
 </div>
 </div>
-</div>
-<div class="section" id="outline">
-<h1>Outline<a class="headerlink" href="#outline" title="Permalink to this headline">¶</a></h1>
-<ul class="simple">
-<li><dl class="first docutils">
-<dt>User’s Guide</dt>
-<dd><ul class="first last">
-<li>Installation</li>
-<li>Quick Start</li>
-<li>Design Goals</li>
-<li>API</li>
-<li>Schema</li>
-<li>Collections</li>
-<li>Versioning</li>
-</ul>
-</dd>
-</dl>
-</li>
-<li><dl class="first docutils">
-<dt>Philosophy</dt>
-<dd><ul class="first last">
-<li>Organic Development</li>
-<li>Service Oriented Architecture</li>
-<li>Design Process</li>
-<li>Maintainability</li>
-</ul>
-</dd>
-</dl>
-</li>
-<li><dl class="first docutils">
-<dt>Tutorial</dt>
-<dd><ul class="first last">
-<li><dl class="first docutils">
-<dt>Before You Code</dt>
-<dd><ul class="first last">
-<li>Problem Statement</li>
-<li>Research</li>
-<li>Brainstorming</li>
-<li>Scoping</li>
-<li>Reframing</li>
-</ul>
-</dd>
-</dl>
-</li>
-<li><dl class="first docutils">
-<dt>Iteration One</dt>
-<dd><ul class="first last">
-<li>Build</li>
-<li>Test</li>
-<li>Communicate</li>
-</ul>
-</dd>
-</dl>
-</li>
-<li><dl class="first docutils">
-<dt>Iteration Two</dt>
-<dd><ul class="first last">
-<li>Build</li>
-<li>Test</li>
-<li>Communicate</li>
-</ul>
-</dd>
-</dl>
-</li>
-<li><dl class="first docutils">
-<dt>Iteration Three</dt>
-<dd><ul class="first last">
-<li>Research</li>
-<li>Build</li>
-<li>Test</li>
-<li>Communicate</li>
-</ul>
-</dd>
-</dl>
-</li>
-<li>Retrospective</li>
-</ul>
-</dd>
-</dl>
-</li>
-</ul>
 <div class="section" id="module-splendor.schema.fields">
 <span id="reference"></span><h2>Reference<a class="headerlink" href="#module-splendor.schema.fields" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="splendor.schema.fields.Schematic">
-<em class="property">class </em><code class="descclassname">splendor.schema.fields.</code><code class="descname">Schematic</code><span class="sig-paren">(</span><em>__schematic_config__=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/splendor/schema/fields.html#Schematic"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#splendor.schema.fields.Schematic" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="descclassname">splendor.schema.fields.</code><code class="descname">Schematic</code><span class="sig-paren">(</span><em>__value__=None</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/splendor/schema/fields.html#Schematic"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#splendor.schema.fields.Schematic" title="Permalink to this definition">¶</a></dt>
 <dd><p>Construct that carries a schema (<cite>__schema__</cite>) and enforces its properties
 to follow it.</p>
 <dl class="method">
 <dt id="splendor.schema.fields.Schematic.get_schema_value">
-<code class="descname">get_schema_value</code><span class="sig-paren">(</span><em>ignore_default=False</em>, <em>ignore_empty=True</em>, <em>export=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/splendor/schema/fields.html#Schematic.get_schema_value"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#splendor.schema.fields.Schematic.get_schema_value" title="Permalink to this definition">¶</a></dt>
+<code class="descname">get_schema_value</code><span class="sig-paren">(</span><em>ignore_default=False</em>, <em>ignore_empty=True</em>, <em>internal=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/splendor/schema/fields.html#Schematic.get_schema_value"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#splendor.schema.fields.Schematic.get_schema_value" title="Permalink to this definition">¶</a></dt>
 <dd><p>Combines the schema-property values of this object with the inherited ones,
 and returns it as a dict.</p>
 <p>If <cite>ignore_default</cite> is <cite>True</cite> (default) properties with default values won’t

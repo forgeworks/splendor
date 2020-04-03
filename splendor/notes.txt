@@ -1,0 +1,9 @@
+
+
+NEEDS:
+  - Work with type hinters / dataclasses (read about stubs)
+  - Required vs Optional
+  - Validate when
+  - Class decorator instead of base class?
+  - Class/Util methods instead of given methods (i.e. Schema.validate(obj) vs obj.validate())
+  - Validate should just work better
